@@ -26,6 +26,10 @@ const electronAPI = {
   admin: {
     registerUser: (input: { userId: string; name: string; password: string; role: 'USER' | 'ADMIN' }) =>
       ipcRenderer.invoke('admin:registerUser', input),
+    updateUser: (input: { userId: string; name?: string; role?: 'USER' | 'ADMIN'; newPassword?: string }) =>
+      ipcRenderer.invoke('admin:updateUser', input),
+    toggleBlockUser: (targetUserId: string) => ipcRenderer.invoke('admin:toggleBlockUser', targetUserId),
+    deleteUser: (targetUserId: string) => ipcRenderer.invoke('admin:deleteUser', targetUserId),
     getAllUsers: () => ipcRenderer.invoke('admin:getAllUsers'),
     getAllAttendance: (targetUserId?: string) =>
       ipcRenderer.invoke('admin:getAllAttendance', targetUserId),
@@ -36,6 +40,8 @@ const electronAPI = {
     getConfig: () => ipcRenderer.invoke('admin:getConfig'),
     updateConfig: (input: { lateEntryTime: string; earlyExitTime: string }) =>
       ipcRenderer.invoke('admin:updateConfig', input),
+    updateBranding: (input: { name?: string; logoUrl?: string }) =>
+      ipcRenderer.invoke('admin:updateBranding', input),
   },
 };
 

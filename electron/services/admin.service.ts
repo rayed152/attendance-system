@@ -22,6 +22,18 @@ export interface RegisterUserInput {
   role: Role;
 }
 
+export interface UpdateUserInput {
+  userId: string;
+  name?: string;
+  role?: Role;
+  newPassword?: string;
+}
+
+export interface UpdateBrandingInput {
+  name?: string;
+  logoUrl?: string;
+}
+
 export class AdminService {
   private prisma: PrismaClient;
   private attendanceService: AttendanceService;
@@ -59,7 +71,6 @@ export class AdminService {
     const trimmedName = name.trim();
 
     try {
-      // Check if User ID already exists in this organization
       const existing = await this.prisma.user.findUnique({
         where: {
           organizationId_userId: {
@@ -76,7 +87,6 @@ export class AdminService {
         };
       }
 
-      // Hash password securely
       const passwordHash = await bcrypt.hash(password, 10);
 
       const newUser = await this.prisma.user.create({
@@ -86,12 +96,14 @@ export class AdminService {
           name: trimmedName,
           passwordHash,
           role: role || Role.USER,
+          isBlocked: false,
         },
         select: {
           id: true,
           userId: true,
           name: true,
           role: true,
+          isBlocked: true,
           createdAt: true,
         },
       });
@@ -104,6 +116,147 @@ export class AdminService {
     } catch (error: any) {
       console.error('AdminService.registerUser error:', error);
       return { success: false, message: error?.message || 'Failed to register new user.' };
+    }
+  }
+
+  /**
+   * Edit user info (name, role, password reset)
+   */
+  async updateUser(sessionUser: UserSession | null, input: UpdateUserInput) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    const { userId, name, role, newPassword } = input || {};
+    if (!userId) {
+      return { success: false, message: 'Target User ID is required.' };
+    }
+
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: sessionUser!.organizationId,
+            userId,
+          },
+        },
+      });
+
+      if (!user) {
+        return { success: false, message: 'User not found in your company.' };
+      }
+
+      const updateData: any = {};
+      if (name && name.trim()) updateData.name = name.trim();
+      if (role) updateData.role = role;
+      if (newPassword && newPassword.trim()) {
+        updateData.passwordHash = await bcrypt.hash(newPassword.trim(), 10);
+      }
+
+      const updated = await this.prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+        select: {
+          id: true,
+          userId: true,
+          name: true,
+          role: true,
+          isBlocked: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: `User "${updated.name}" (${updated.userId}) updated successfully.`,
+        data: updated,
+      };
+    } catch (error: any) {
+      console.error('AdminService.updateUser error:', error);
+      return { success: false, message: error?.message || 'Failed to update user.' };
+    }
+  }
+
+  /**
+   * Block / Unblock user
+   */
+  async toggleBlockUser(sessionUser: UserSession | null, targetUserId: string) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    if (targetUserId === sessionUser!.userId) {
+      return { success: false, message: 'You cannot block your own admin account.' };
+    }
+
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: sessionUser!.organizationId,
+            userId: targetUserId,
+          },
+        },
+      });
+
+      if (!user) {
+        return { success: false, message: 'User not found in your company.' };
+      }
+
+      const updated = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { isBlocked: !user.isBlocked },
+      });
+
+      const action = updated.isBlocked ? 'blocked / suspended' : 'unblocked';
+      return {
+        success: true,
+        message: `User "${updated.name}" (${updated.userId}) has been ${action}.`,
+        data: { userId: updated.userId, isBlocked: updated.isBlocked },
+      };
+    } catch (error: any) {
+      console.error('AdminService.toggleBlockUser error:', error);
+      return { success: false, message: error?.message || 'Failed to toggle user status.' };
+    }
+  }
+
+  /**
+   * Kick / Delete user from company
+   */
+  async deleteUser(sessionUser: UserSession | null, targetUserId: string) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    if (targetUserId === sessionUser!.userId) {
+      return { success: false, message: 'You cannot delete your own admin account.' };
+    }
+
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: sessionUser!.organizationId,
+            userId: targetUserId,
+          },
+        },
+      });
+
+      if (!user) {
+        return { success: false, message: 'User not found in your company.' };
+      }
+
+      await this.prisma.user.delete({ where: { id: user.id } });
+
+      return {
+        success: true,
+        message: `User "${user.name}" (${user.userId}) has been removed from company.`,
+      };
+    } catch (error: any) {
+      console.error('AdminService.deleteUser error:', error);
+      return { success: false, message: error?.message || 'Failed to delete user.' };
     }
   }
 
@@ -124,6 +277,7 @@ export class AdminService {
           userId: true,
           name: true,
           role: true,
+          isBlocked: true,
           createdAt: true,
         },
         orderBy: { name: 'asc' },
@@ -274,7 +428,20 @@ export class AdminService {
 
     try {
       const config = await this.attendanceService.getConfig(sessionUser!.organizationId);
-      return { success: true, data: config };
+      const org = await this.prisma.organization.findUnique({
+        where: { id: sessionUser!.organizationId },
+        select: { name: true, logoUrl: true, companyCode: true },
+      });
+
+      return {
+        success: true,
+        data: {
+          ...config,
+          companyName: org?.name,
+          logoUrl: org?.logoUrl,
+          companyCode: org?.companyCode,
+        },
+      };
     } catch (error: any) {
       console.error('AdminService.getConfig error:', error);
       return { success: false, message: error?.message || 'Failed to fetch settings.' };
@@ -314,6 +481,41 @@ export class AdminService {
     } catch (error: any) {
       console.error('AdminService.updateConfig error:', error);
       return { success: false, message: error?.message || 'Failed to update threshold settings.' };
+    }
+  }
+
+  /**
+   * Update Company Branding (Name and Logo URL)
+   */
+  async updateOrganizationBranding(sessionUser: UserSession | null, input: UpdateBrandingInput) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    const { name, logoUrl } = input || {};
+    try {
+      const updated = await this.prisma.organization.update({
+        where: { id: sessionUser!.organizationId },
+        data: {
+          name: name && name.trim() ? name.trim() : undefined,
+          logoUrl: logoUrl !== undefined ? logoUrl : undefined,
+        },
+      });
+
+      if (sessionUser) {
+        sessionUser.companyName = updated.name;
+        sessionUser.logoUrl = updated.logoUrl;
+      }
+
+      return {
+        success: true,
+        message: 'Company Branding settings updated successfully.',
+        data: { name: updated.name, logoUrl: updated.logoUrl },
+      };
+    } catch (error: any) {
+      console.error('AdminService.updateOrganizationBranding error:', error);
+      return { success: false, message: error?.message || 'Failed to update company branding.' };
     }
   }
 }

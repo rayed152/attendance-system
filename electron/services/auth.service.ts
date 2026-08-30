@@ -6,6 +6,7 @@ export interface UserSession {
   id: string;
   organizationId: string;
   companyName: string;
+  logoUrl?: string | null;
   userId: string;
   name: string;
   role: Role;
@@ -55,12 +56,21 @@ export class AuthService {
             userId: trimmedUserId,
           },
         },
+        include: { organization: true },
       });
 
       if (!user) {
         return {
           success: false,
           message: 'Invalid User ID or Password for this company.',
+        };
+      }
+
+      // Check if user is blocked
+      if (user.isBlocked) {
+        return {
+          success: false,
+          message: 'Your account has been suspended by company administration. Please contact your administrator.',
         };
       }
 
@@ -75,7 +85,8 @@ export class AuthService {
       this.currentSession = {
         id: user.id,
         organizationId: user.organizationId,
-        companyName: tenant.name,
+        companyName: user.organization.name,
+        logoUrl: user.organization.logoUrl,
         userId: user.userId,
         name: user.name,
         role: user.role,

@@ -120,6 +120,21 @@ function registerIpcHandlers() {
     return await adminService.registerUser(user, input);
   });
 
+  ipcMain.handle('admin:updateUser', async (_event, input) => {
+    const user = authService.getCurrentSession();
+    return await adminService.updateUser(user, input);
+  });
+
+  ipcMain.handle('admin:toggleBlockUser', async (_event, targetUserId: string) => {
+    const user = authService.getCurrentSession();
+    return await adminService.toggleBlockUser(user, targetUserId);
+  });
+
+  ipcMain.handle('admin:deleteUser', async (_event, targetUserId: string) => {
+    const user = authService.getCurrentSession();
+    return await adminService.deleteUser(user, targetUserId);
+  });
+
   ipcMain.handle('admin:getAllUsers', async () => {
     const user = authService.getCurrentSession();
     return await adminService.getAllUsers(user);
@@ -149,6 +164,11 @@ function registerIpcHandlers() {
   ipcMain.handle('admin:updateConfig', async (_event, input) => {
     const user = authService.getCurrentSession();
     return await adminService.updateConfig(user, input);
+  });
+
+  ipcMain.handle('admin:updateBranding', async (_event, input) => {
+    const user = authService.getCurrentSession();
+    return await adminService.updateOrganizationBranding(user, input);
   });
 }
 

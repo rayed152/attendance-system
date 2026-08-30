@@ -13,6 +13,8 @@ interface DashboardProps {
     userId: string;
     name: string;
     role: 'USER' | 'ADMIN';
+    companyName?: string;
+    logoUrl?: string | null;
   };
   onLogout: () => void;
 }
@@ -136,12 +138,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
         onLogout={onLogout}
       />
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-6 py-8 space-y-8">
+      <main className="flex-1 w-full">
         {/* Render Admin Dashboard if Admin tab selected */}
         {activeTab === 'admin' && user.role === 'ADMIN' ? (
-          <AdminDashboard />
+          <div className="max-w-screen-2xl w-full mx-auto px-6 py-8">
+            <AdminDashboard />
+          </div>
         ) : (
-          <>
+          <div className="max-w-5xl w-full mx-auto px-6 py-8 space-y-8">
             {/* User Warning Notices Banner */}
             <UserWarningsBanner
               warnings={warnings}
@@ -256,7 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
             {/* User Attendance History Section */}
             <AttendanceTable records={history} />
-          </>
+          </div>
         )}
       </main>
     </div>

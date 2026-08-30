@@ -24,7 +24,8 @@ model Organization {
   name        String
   companyCode String         @unique
   licenseKey  String         @unique
-  isVerified  Boolean        @default(false) // Default to false pending admin approval
+  logoUrl     String?        // Custom company logo URL or base64
+  isVerified  Boolean        @default(false)
   createdAt   DateTime       @default(now())
   users       User[]
   attendances Attendance[]
@@ -40,6 +41,7 @@ model User {
   name           String
   passwordHash   String
   role           Role         @default(USER)
+  isBlocked      Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   attendances    Attendance[]
