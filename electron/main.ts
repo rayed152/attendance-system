@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import { TenantService } from './services/tenant.service';
 import { AuthService } from './services/auth.service';
 import { AttendanceService } from './services/attendance.service';
 import { AdminService } from './services/admin.service';
@@ -11,8 +12,9 @@ dotenv.config();
 
 let mainWindow: BrowserWindow | null = null;
 const prisma = new PrismaClient();
-const authService = new AuthService(prisma);
-const attendanceService = new AttendanceService(prisma);
+const tenantService = new TenantService(prisma);
+const authService = new AuthService(prisma, tenantService);
+const attendanceService = new AttendanceService(prisma, tenantService);
 const adminService = new AdminService(prisma, attendanceService);
 
 function createWindow() {
@@ -21,7 +23,7 @@ function createWindow() {
     height: 800,
     minWidth: 850,
     minHeight: 650,
-    title: 'Attendance System',
+    title: 'Attendance System (SaaS)',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -44,6 +46,29 @@ function createWindow() {
 }
 
 function registerIpcHandlers() {
+  // Tenant / License Handlers
+  ipcMain.handle('tenant:getActiveTenant', async () => {
+    return await tenantService.getActiveTenant();
+  });
+
+  ipcMain.handle('tenant:validateLicenseKey', async (_event, licenseKey: string) => {
+    return await tenantService.validateAndSetLicenseKey(licenseKey);
+  });
+
+  ipcMain.handle('tenant:clearLicenseKey', async () => {
+    tenantService.clearLicenseKey();
+    authService.logout();
+    return { success: true };
+  });
+
+  ipcMain.handle('tenant:searchOrganizations', async (_event, query: string) => {
+    return await tenantService.searchOrganizations(query);
+  });
+
+  ipcMain.handle('tenant:registerOrganization', async (_event, input) => {
+    return await tenantService.registerOrganization(input);
+  });
+
   // Auth Handlers
   ipcMain.handle('auth:login', async (_event, credentials) => {
     const { userId, password } = credentials || {};
@@ -90,6 +115,11 @@ function registerIpcHandlers() {
   });
 
   // Admin Handlers
+  ipcMain.handle('admin:registerUser', async (_event, input) => {
+    const user = authService.getCurrentSession();
+    return await adminService.registerUser(user, input);
+  });
+
   ipcMain.handle('admin:getAllUsers', async () => {
     const user = authService.getCurrentSession();
     return await adminService.getAllUsers(user);

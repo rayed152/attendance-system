@@ -1,21 +1,23 @@
 import { PrismaClient, AttendanceType } from '@prisma/client';
 import { UserSession } from './auth.service';
+import { TenantService } from './tenant.service';
 
 export interface AttendanceRecord {
   id: string;
+  organizationId: string;
   userId: string;
   userName?: string;
   type: 'ENTRY' | 'EXIT';
-  statusFlag?: string | null; // 'LATE' | 'EARLY_EXIT' | 'ON_TIME'
+  statusFlag?: string | null;
   note?: string | null;
-  timestamp: string; // ISO string
-  date: string;      // YYYY-MM-DD
-  time: string;      // HH:mm:ss
+  timestamp: string;
+  date: string;
+  time: string;
 }
 
 export interface SystemConfigData {
-  lateEntryTime: string; // "HH:mm"
-  earlyExitTime: string; // "HH:mm"
+  lateEntryTime: string;
+  earlyExitTime: string;
 }
 
 export interface AttendanceResponse {
@@ -26,24 +28,38 @@ export interface AttendanceResponse {
 
 export class AttendanceService {
   private prisma: PrismaClient;
+  private tenantService: TenantService;
 
-  constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient, tenantService: TenantService) {
     this.prisma = prisma;
+    this.tenantService = tenantService;
   }
 
   /**
-   * Get active system config (lateEntryTime & earlyExitTime thresholds)
+   * Get system config for a specific organization
    */
-  async getConfig(): Promise<SystemConfigData> {
+  async getConfig(organizationId?: string): Promise<SystemConfigData> {
     try {
+      let targetOrgId = organizationId;
+      if (!targetOrgId) {
+        const tenantRes = await this.tenantService.getActiveTenant();
+        if (tenantRes.success && tenantRes.tenant) {
+          targetOrgId = tenantRes.tenant.id;
+        }
+      }
+
+      if (!targetOrgId) {
+        return { lateEntryTime: '09:00', earlyExitTime: '17:00' };
+      }
+
       let config = await this.prisma.systemConfig.findUnique({
-        where: { id: 'default' },
+        where: { organizationId: targetOrgId },
       });
 
       if (!config) {
         config = await this.prisma.systemConfig.create({
           data: {
-            id: 'default',
+            organizationId: targetOrgId,
             lateEntryTime: '09:00',
             earlyExitTime: '17:00',
           },
@@ -61,10 +77,10 @@ export class AttendanceService {
   }
 
   /**
-   * Determine punctuality status flag based on timestamp, type, and configured thresholds
+   * Determine status flag based on timestamp, type, and organization thresholds
    */
-  public async calculateStatusFlag(type: AttendanceType, timestamp: Date): Promise<string> {
-    const config = await this.getConfig();
+  public async calculateStatusFlag(organizationId: string, type: AttendanceType, timestamp: Date): Promise<string> {
+    const config = await this.getConfig(organizationId);
     const tsMinutes = timestamp.getHours() * 60 + timestamp.getMinutes();
 
     if (type === AttendanceType.ENTRY) {
@@ -96,7 +112,10 @@ export class AttendanceService {
 
     try {
       const latest = await this.prisma.attendance.findFirst({
-        where: { userId: sessionUser.userId },
+        where: {
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+        },
         orderBy: { timestamp: 'desc' },
       });
 
@@ -108,11 +127,12 @@ export class AttendanceService {
       }
 
       const now = new Date();
-      const statusFlag = await this.calculateStatusFlag(AttendanceType.ENTRY, now);
-      const config = await this.getConfig();
+      const statusFlag = await this.calculateStatusFlag(sessionUser.organizationId, AttendanceType.ENTRY, now);
+      const config = await this.getConfig(sessionUser.organizationId);
 
       const newRecord = await this.prisma.attendance.create({
         data: {
+          organizationId: sessionUser.organizationId,
           userId: sessionUser.userId,
           type: AttendanceType.ENTRY,
           statusFlag,
@@ -148,7 +168,10 @@ export class AttendanceService {
 
     try {
       const latest = await this.prisma.attendance.findFirst({
-        where: { userId: sessionUser.userId },
+        where: {
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+        },
         orderBy: { timestamp: 'desc' },
       });
 
@@ -160,11 +183,12 @@ export class AttendanceService {
       }
 
       const now = new Date();
-      const statusFlag = await this.calculateStatusFlag(AttendanceType.EXIT, now);
-      const config = await this.getConfig();
+      const statusFlag = await this.calculateStatusFlag(sessionUser.organizationId, AttendanceType.EXIT, now);
+      const config = await this.getConfig(sessionUser.organizationId);
 
       const newRecord = await this.prisma.attendance.create({
         data: {
+          organizationId: sessionUser.organizationId,
           userId: sessionUser.userId,
           type: AttendanceType.EXIT,
           statusFlag,
@@ -200,7 +224,10 @@ export class AttendanceService {
 
     try {
       const latest = await this.prisma.attendance.findFirst({
-        where: { userId: sessionUser.userId },
+        where: {
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+        },
         orderBy: { timestamp: 'desc' },
       });
 
@@ -226,7 +253,10 @@ export class AttendanceService {
 
     try {
       const records = await this.prisma.attendance.findMany({
-        where: { userId: sessionUser.userId },
+        where: {
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+        },
         orderBy: { timestamp: 'desc' },
         include: { user: { select: { name: true } } },
       });
@@ -253,7 +283,11 @@ export class AttendanceService {
 
     try {
       const warnings = await this.prisma.warning.findMany({
-        where: { userId: sessionUser.userId, isRead: false },
+        where: {
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+          isRead: false,
+        },
         orderBy: { createdAt: 'desc' },
       });
 
@@ -277,7 +311,11 @@ export class AttendanceService {
 
     try {
       await this.prisma.warning.updateMany({
-        where: { id: warningId, userId: sessionUser.userId },
+        where: {
+          id: warningId,
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+        },
         data: { isRead: true },
       });
 
@@ -295,6 +333,7 @@ export class AttendanceService {
 
     return {
       id: record.id,
+      organizationId: record.organizationId,
       userId: record.userId,
       userName: record.user?.name,
       type: record.type,

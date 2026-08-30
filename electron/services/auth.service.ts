@@ -1,8 +1,11 @@
 import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { TenantService } from './tenant.service';
 
 export interface UserSession {
   id: string;
+  organizationId: string;
+  companyName: string;
   userId: string;
   name: string;
   role: Role;
@@ -16,10 +19,12 @@ export interface AuthResponse {
 
 export class AuthService {
   private prisma: PrismaClient;
+  private tenantService: TenantService;
   private currentSession: UserSession | null = null;
 
-  constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient, tenantService: TenantService) {
     this.prisma = prisma;
+    this.tenantService = tenantService;
   }
 
   async login(userIdInput: string, passwordInput: string): Promise<AuthResponse> {
@@ -31,16 +36,31 @@ export class AuthService {
         };
       }
 
+      // Check active tenant bound to this desktop app
+      const activeTenantRes = await this.tenantService.getActiveTenant();
+      if (!activeTenantRes.success || !activeTenantRes.tenant) {
+        return {
+          success: false,
+          message: 'Application is not activated for any company. Please activate your License Key first.',
+        };
+      }
+
+      const tenant = activeTenantRes.tenant;
       const trimmedUserId = userIdInput.trim();
 
       const user = await this.prisma.user.findUnique({
-        where: { userId: trimmedUserId },
+        where: {
+          organizationId_userId: {
+            organizationId: tenant.id,
+            userId: trimmedUserId,
+          },
+        },
       });
 
       if (!user) {
         return {
           success: false,
-          message: 'Invalid User ID or Password.',
+          message: 'Invalid User ID or Password for this company.',
         };
       }
 
@@ -54,6 +74,8 @@ export class AuthService {
 
       this.currentSession = {
         id: user.id,
+        organizationId: user.organizationId,
+        companyName: tenant.name,
         userId: user.userId,
         name: user.name,
         role: user.role,

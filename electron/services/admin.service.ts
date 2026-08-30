@@ -1,4 +1,5 @@
 import { PrismaClient, Role, AttendanceType } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { UserSession } from './auth.service';
 import { AttendanceService } from './attendance.service';
 
@@ -14,6 +15,13 @@ export interface UpdateConfigInput {
   earlyExitTime: string;
 }
 
+export interface RegisterUserInput {
+  userId: string;
+  name: string;
+  password: string;
+  role: Role;
+}
+
 export class AdminService {
   private prisma: PrismaClient;
   private attendanceService: AttendanceService;
@@ -23,20 +31,94 @@ export class AdminService {
     this.attendanceService = attendanceService;
   }
 
-  private verifyAdmin(sessionUser: UserSession | null): boolean {
-    return !!sessionUser && sessionUser.role === Role.ADMIN;
+  private verifyAdmin(sessionUser: UserSession | null): { valid: boolean; message?: string } {
+    if (!sessionUser) {
+      return { valid: false, message: 'Session expired or invalid. Please log out and log in again.' };
+    }
+    if (sessionUser.role !== Role.ADMIN) {
+      return { valid: false, message: 'Access denied. Admin privileges required.' };
+    }
+    return { valid: true };
   }
 
   /**
-   * Fetch all registered users (Admin only)
+   * Register a new user in Admin's Organization (Admin only)
+   */
+  async registerUser(sessionUser: UserSession | null, input: RegisterUserInput) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    const { userId, name, password, role } = input || {};
+    if (!userId || !userId.trim() || !name || !name.trim() || !password) {
+      return { success: false, message: 'User ID, Full Name, and Password are required.' };
+    }
+
+    const trimmedUserId = userId.trim();
+    const trimmedName = name.trim();
+
+    try {
+      // Check if User ID already exists in this organization
+      const existing = await this.prisma.user.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: sessionUser!.organizationId,
+            userId: trimmedUserId,
+          },
+        },
+      });
+
+      if (existing) {
+        return {
+          success: false,
+          message: `User ID "${trimmedUserId}" already exists in your company.`,
+        };
+      }
+
+      // Hash password securely
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const newUser = await this.prisma.user.create({
+        data: {
+          organizationId: sessionUser!.organizationId,
+          userId: trimmedUserId,
+          name: trimmedName,
+          passwordHash,
+          role: role || Role.USER,
+        },
+        select: {
+          id: true,
+          userId: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: `User "${newUser.name}" (${newUser.userId}) registered successfully as ${newUser.role}.`,
+        data: newUser,
+      };
+    } catch (error: any) {
+      console.error('AdminService.registerUser error:', error);
+      return { success: false, message: error?.message || 'Failed to register new user.' };
+    }
+  }
+
+  /**
+   * Fetch all registered users in Admin's Organization
    */
   async getAllUsers(sessionUser: UserSession | null) {
-    if (!this.verifyAdmin(sessionUser)) {
-      return { success: false, message: 'Access denied. Admin privileges required.' };
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
     }
 
     try {
       const users = await this.prisma.user.findMany({
+        where: { organizationId: sessionUser!.organizationId },
         select: {
           id: true,
           userId: true,
@@ -50,22 +132,24 @@ export class AdminService {
       return { success: true, data: users };
     } catch (error: any) {
       console.error('AdminService.getAllUsers error:', error);
-      return { success: false, message: 'Failed to fetch users.' };
+      return { success: false, message: error?.message || 'Failed to fetch users.' };
     }
   }
 
   /**
-   * Fetch all attendance records across all users (Admin only)
+   * Fetch attendance records in Admin's Organization
    */
   async getAllAttendance(sessionUser: UserSession | null, targetUserId?: string) {
-    if (!this.verifyAdmin(sessionUser)) {
-      return { success: false, message: 'Access denied. Admin privileges required.' };
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
     }
 
     try {
-      const whereCondition = targetUserId && targetUserId !== 'ALL'
-        ? { userId: targetUserId }
-        : {};
+      const whereCondition: any = { organizationId: sessionUser!.organizationId };
+      if (targetUserId && targetUserId !== 'ALL') {
+        whereCondition.userId = targetUserId;
+      }
 
       const records = await this.prisma.attendance.findMany({
         where: whereCondition,
@@ -78,31 +162,38 @@ export class AdminService {
       return { success: true, data: formatted };
     } catch (error: any) {
       console.error('AdminService.getAllAttendance error:', error);
-      return { success: false, message: 'Failed to fetch attendance records.' };
+      return { success: false, message: error?.message || 'Failed to fetch attendance records.' };
     }
   }
 
   /**
-   * Edit attendance record (Admin only)
+   * Edit attendance record in Admin's Organization
    */
   async updateAttendance(sessionUser: UserSession | null, input: UpdateAttendanceInput) {
-    if (!this.verifyAdmin(sessionUser)) {
-      return { success: false, message: 'Access denied. Admin privileges required.' };
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
     }
 
     try {
       const { id, type, timestamp, note } = input;
 
-      const existing = await this.prisma.attendance.findUnique({ where: { id } });
+      const existing = await this.prisma.attendance.findFirst({
+        where: { id, organizationId: sessionUser!.organizationId },
+      });
+
       if (!existing) {
-        return { success: false, message: 'Attendance record not found.' };
+        return { success: false, message: 'Attendance record not found in your organization.' };
       }
 
       const newTimestamp = timestamp ? new Date(timestamp) : existing.timestamp;
       const newType = type ? (type as AttendanceType) : existing.type;
 
-      // Recalculate status flag based on active configured thresholds
-      const statusFlag = await this.attendanceService.calculateStatusFlag(newType, newTimestamp);
+      const statusFlag = await this.attendanceService.calculateStatusFlag(
+        sessionUser!.organizationId,
+        newType,
+        newTimestamp
+      );
 
       const updated = await this.prisma.attendance.update({
         where: { id },
@@ -121,16 +212,17 @@ export class AdminService {
       };
     } catch (error: any) {
       console.error('AdminService.updateAttendance error:', error);
-      return { success: false, message: 'Failed to update attendance record.' };
+      return { success: false, message: error?.message || 'Failed to update attendance record.' };
     }
   }
 
   /**
-   * Issue warning to a user (Admin only)
+   * Issue warning to a user in Admin's Organization
    */
   async warnUser(sessionUser: UserSession | null, targetUserId: string, message: string) {
-    if (!this.verifyAdmin(sessionUser)) {
-      return { success: false, message: 'Access denied. Admin privileges required.' };
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
     }
 
     if (!targetUserId || !message.trim()) {
@@ -138,13 +230,22 @@ export class AdminService {
     }
 
     try {
-      const user = await this.prisma.user.findUnique({ where: { userId: targetUserId } });
+      const user = await this.prisma.user.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: sessionUser!.organizationId,
+            userId: targetUserId,
+          },
+        },
+      });
+
       if (!user) {
-        return { success: false, message: 'Target user does not exist.' };
+        return { success: false, message: 'Target user does not exist in your organization.' };
       }
 
       const warning = await this.prisma.warning.create({
         data: {
+          organizationId: sessionUser!.organizationId,
           userId: targetUserId,
           message: message.trim(),
           issuedBy: sessionUser!.userId,
@@ -158,33 +259,35 @@ export class AdminService {
       };
     } catch (error: any) {
       console.error('AdminService.warnUser error:', error);
-      return { success: false, message: 'Failed to issue warning.' };
+      return { success: false, message: error?.message || 'Failed to issue warning.' };
     }
   }
 
   /**
-   * Get current attendance threshold settings (Admin only)
+   * Get shift threshold settings for Admin's Organization
    */
   async getConfig(sessionUser: UserSession | null) {
-    if (!this.verifyAdmin(sessionUser)) {
-      return { success: false, message: 'Access denied.' };
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
     }
 
     try {
-      const config = await this.attendanceService.getConfig();
+      const config = await this.attendanceService.getConfig(sessionUser!.organizationId);
       return { success: true, data: config };
     } catch (error: any) {
       console.error('AdminService.getConfig error:', error);
-      return { success: false, message: 'Failed to fetch settings.' };
+      return { success: false, message: error?.message || 'Failed to fetch settings.' };
     }
   }
 
   /**
-   * Update attendance threshold settings (Admin only)
+   * Update shift threshold settings for Admin's Organization
    */
   async updateConfig(sessionUser: UserSession | null, input: UpdateConfigInput) {
-    if (!this.verifyAdmin(sessionUser)) {
-      return { success: false, message: 'Access denied. Admin privileges required.' };
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
     }
 
     const { lateEntryTime, earlyExitTime } = input;
@@ -194,19 +297,23 @@ export class AdminService {
 
     try {
       const updated = await this.prisma.systemConfig.upsert({
-        where: { id: 'default' },
+        where: { organizationId: sessionUser!.organizationId },
         update: { lateEntryTime, earlyExitTime },
-        create: { id: 'default', lateEntryTime, earlyExitTime },
+        create: {
+          organizationId: sessionUser!.organizationId,
+          lateEntryTime,
+          earlyExitTime,
+        },
       });
 
       return {
         success: true,
-        message: `Punctuality settings updated! Late Entry threshold: ${updated.lateEntryTime}, Early Exit threshold: ${updated.earlyExitTime}.`,
+        message: `Punctuality settings updated for your company! Late Entry threshold: ${updated.lateEntryTime}, Early Exit threshold: ${updated.earlyExitTime}.`,
         data: { lateEntryTime: updated.lateEntryTime, earlyExitTime: updated.earlyExitTime },
       };
     } catch (error: any) {
       console.error('AdminService.updateConfig error:', error);
-      return { success: false, message: 'Failed to update threshold settings.' };
+      return { success: false, message: error?.message || 'Failed to update threshold settings.' };
     }
   }
 }

@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const electronAPI = {
+  tenant: {
+    getActiveTenant: () => ipcRenderer.invoke('tenant:getActiveTenant'),
+    validateLicenseKey: (licenseKey: string) => ipcRenderer.invoke('tenant:validateLicenseKey', licenseKey),
+    clearLicenseKey: () => ipcRenderer.invoke('tenant:clearLicenseKey'),
+    searchOrganizations: (query: string) => ipcRenderer.invoke('tenant:searchOrganizations', query),
+    registerOrganization: (input: { name: string; companyCode: string; licenseKey: string; adminUserId?: string; adminPassword?: string }) =>
+      ipcRenderer.invoke('tenant:registerOrganization', input),
+  },
   auth: {
     login: (credentials: { userId: string; password: string }) =>
       ipcRenderer.invoke('auth:login', credentials),
@@ -16,6 +24,8 @@ const electronAPI = {
     dismissWarning: (warningId: string) => ipcRenderer.invoke('attendance:dismissWarning', warningId),
   },
   admin: {
+    registerUser: (input: { userId: string; name: string; password: string; role: 'USER' | 'ADMIN' }) =>
+      ipcRenderer.invoke('admin:registerUser', input),
     getAllUsers: () => ipcRenderer.invoke('admin:getAllUsers'),
     getAllAttendance: (targetUserId?: string) =>
       ipcRenderer.invoke('admin:getAllAttendance', targetUserId),

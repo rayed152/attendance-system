@@ -3,8 +3,9 @@ import { AttendanceTable } from '../components/AttendanceTable';
 import { EditAttendanceModal } from '../components/EditAttendanceModal';
 import { WarnUserModal } from '../components/WarnUserModal';
 import { ConfigModal } from '../components/ConfigModal';
+import { RegisterUserModal } from '../components/RegisterUserModal';
 import { Alert } from '../components/Alert';
-import { Users, AlertTriangle, RefreshCw, ShieldAlert, FileSpreadsheet, Settings2 } from 'lucide-react';
+import { Users, AlertTriangle, RefreshCw, ShieldAlert, FileSpreadsheet, Settings2, UserPlus } from 'lucide-react';
 import { AttendanceRecord } from '../../electron/services/attendance.service';
 
 interface UserItem {
@@ -21,6 +22,7 @@ export const AdminDashboard: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
   const [isWarnModalOpen, setIsWarnModalOpen] = useState<boolean>(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState<boolean>(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
   const [config, setConfig] = useState<{ lateEntryTime: string; earlyExitTime: string }>({
     lateEntryTime: '09:00',
     earlyExitTime: '17:00',
@@ -75,6 +77,21 @@ export const AdminDashboard: React.FC = () => {
   const handleFilterChange = (userId: string) => {
     setSelectedUserFilter(userId);
     fetchAttendanceRecords(userId);
+  };
+
+  const handleRegisterUser = async (input: { userId: string; name: string; password: string; role: 'USER' | 'ADMIN' }) => {
+    try {
+      const res = await window.electronAPI.admin.registerUser(input);
+      if (res.success) {
+        setAlert({ type: 'success', message: res.message || 'User registered successfully.' });
+        fetchUsers();
+      } else {
+        setAlert({ type: 'error', message: res.message || 'Failed to register user.' });
+      }
+    } catch (err) {
+      console.error('Error registering user:', err);
+      setAlert({ type: 'error', message: 'Error registering new user.' });
+    }
   };
 
   const handleSaveEdit = async (updated: { id: string; type: 'ENTRY' | 'EXIT'; timestamp: string; note: string }) => {
@@ -197,14 +214,22 @@ export const AdminDashboard: React.FC = () => {
           </select>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+          <button
+            onClick={() => setIsRegisterModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-800 text-emerald-300 text-xs font-semibold shadow-lg transition-all"
+          >
+            <UserPlus className="w-4 h-4" />
+            Register User
+          </button>
+
           <button
             onClick={() => setIsConfigModalOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-800 text-indigo-300 text-xs font-semibold shadow-lg transition-all"
             title="Configure Late Entry and Early Exit cutoff times"
           >
             <Settings2 className="w-4 h-4" />
-            Set Thresholds ({config.lateEntryTime} / {config.earlyExitTime})
+            Set Thresholds
           </button>
 
           <button
@@ -216,9 +241,12 @@ export const AdminDashboard: React.FC = () => {
           </button>
 
           <button
-            onClick={() => fetchAttendanceRecords(selectedUserFilter)}
+            onClick={() => {
+              fetchUsers();
+              fetchAttendanceRecords(selectedUserFilter);
+            }}
             disabled={loading}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition-all"
             title="Refresh list"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -232,6 +260,13 @@ export const AdminDashboard: React.FC = () => {
         records={records}
         showUserColumn={true}
         onEditRecord={(rec) => setEditingRecord(rec)}
+      />
+
+      {/* Register User Modal */}
+      <RegisterUserModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onRegister={handleRegisterUser}
       />
 
       {/* Edit Modal */}

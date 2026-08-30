@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
-import { ShieldCheck, User, Lock, Loader2 } from 'lucide-react';
+import { ShieldCheck, User, Lock, Loader2, Building2, RefreshCw } from 'lucide-react';
 import { Alert } from '../components/Alert';
 
 interface LoginProps {
+  tenant: {
+    name: string;
+    companyCode: string;
+    licenseKey: string;
+  };
   onLoginSuccess: (user: any) => void;
+  onSwitchLicense: () => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+export const Login: React.FC<LoginProps> = ({ tenant, onLoginSuccess, onSwitchLicense }) => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +60,19 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <ShieldCheck className="w-9 h-9 text-white" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Attendance System</h1>
-          <p className="text-slate-400 text-sm">Log in to record your Entry and Exit</p>
+
+          {/* Bound Company Tenant Badge */}
+          <div className="inline-flex items-center gap-2 bg-slate-900 px-3.5 py-1.5 rounded-full border border-slate-800 text-xs font-semibold text-sky-400">
+            <Building2 className="w-3.5 h-3.5" />
+            <span>{tenant.name}</span>
+            <button
+              onClick={onSwitchLicense}
+              className="ml-1 text-slate-500 hover:text-slate-200 transition-colors"
+              title="Switch Company License"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </button>
+          </div>
         </div>
 
         <div className="glass-panel p-8 rounded-2xl shadow-2xl border border-slate-800 space-y-6">
@@ -108,7 +126,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl shadow-lg shadow-sky-600/25 active:scale-[0.99] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-semibold py-3.5 rounded-xl shadow-lg shadow-sky-600/25 active:scale-[0.99] transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2 mt-2"
             >
               {loading ? (
                 <>
@@ -123,7 +141,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         </div>
 
         <div className="text-center text-xs text-slate-500 font-mono">
-          Connected to Neon PostgreSQL Security Core
+          Tenant License: {tenant.licenseKey}
         </div>
       </div>
     </div>

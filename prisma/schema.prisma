@@ -1,4 +1,4 @@
-// Prisma schema for Attendance Management System
+// Prisma schema for Multi-Tenant Attendance Management System
 
 generator client {
   provider = "prisma-client-js"
@@ -19,48 +19,74 @@ enum AttendanceType {
   EXIT
 }
 
+model Organization {
+  id          String         @id @default(uuid())
+  name        String
+  companyCode String         @unique
+  licenseKey  String         @unique
+  isVerified  Boolean        @default(false) // Default to false pending admin approval
+  createdAt   DateTime       @default(now())
+  users       User[]
+  attendances Attendance[]
+  warnings    Warning[]
+  config      SystemConfig?
+}
+
 model User {
-  id           String       @id @default(uuid())
-  userId       String       @unique
-  name         String
-  passwordHash String
-  role         Role         @default(USER)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  attendances  Attendance[]
-  warnings     Warning[]
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String       
+  name           String
+  passwordHash   String
+  role           Role         @default(USER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  attendances    Attendance[]
+  warnings       Warning[]
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
 }
 
 model Attendance {
-  id         String         @id @default(uuid())
-  userId     String
-  user       User           @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  type       AttendanceType
-  statusFlag String?        // 'LATE' | 'EARLY_EXIT' | 'ON_TIME'
-  note       String?
-  timestamp  DateTime       @default(now())
-  createdAt  DateTime       @default(now())
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User           @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  type           AttendanceType
+  statusFlag     String?        // 'LATE' | 'EARLY_EXIT' | 'ON_TIME'
+  note           String?
+  timestamp      DateTime       @default(now())
+  createdAt      DateTime       @default(now())
 
+  @@index([organizationId])
   @@index([userId])
   @@index([timestamp])
-  @@index([userId, timestamp])
+  @@index([organizationId, userId, timestamp])
 }
 
 model Warning {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  message   String
-  issuedBy  String   // Admin's userId
-  createdAt DateTime @default(now())
-  isRead    Boolean  @default(false)
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [organizationId, userId], references: [organizationId, userId], onDelete: Cascade)
+  message        String
+  issuedBy       String       // Admin's userId
+  createdAt      DateTime     @default(now())
+  isRead         Boolean      @default(false)
 
+  @@index([organizationId])
   @@index([userId])
 }
 
 model SystemConfig {
-  id            String   @id @default("default")
-  lateEntryTime String   @default("09:00") // HH:mm format
-  earlyExitTime String   @default("17:00") // HH:mm format
-  updatedAt     DateTime @updatedAt
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lateEntryTime  String       @default("09:00") // HH:mm format
+  earlyExitTime  String       @default("17:00") // HH:mm format
+  updatedAt      DateTime     @updatedAt
 }
