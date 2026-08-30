@@ -1,0 +1,30 @@
+appId: com.attendancesystem.app
+productName: Attendance System
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+  - prisma/schema.prisma
+  - node_modules/.prisma/**/*
+  - node_modules/@prisma/client/**/*
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  category: Utility
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true

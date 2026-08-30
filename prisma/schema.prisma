@@ -1,0 +1,66 @@
+// Prisma schema for Attendance Management System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AttendanceType {
+  ENTRY
+  EXIT
+}
+
+model User {
+  id           String       @id @default(uuid())
+  userId       String       @unique
+  name         String
+  passwordHash String
+  role         Role         @default(USER)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  attendances  Attendance[]
+  warnings     Warning[]
+}
+
+model Attendance {
+  id         String         @id @default(uuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  type       AttendanceType
+  statusFlag String?        // 'LATE' | 'EARLY_EXIT' | 'ON_TIME'
+  note       String?
+  timestamp  DateTime       @default(now())
+  createdAt  DateTime       @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
+  @@index([userId, timestamp])
+}
+
+model Warning {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  message   String
+  issuedBy  String   // Admin's userId
+  createdAt DateTime @default(now())
+  isRead    Boolean  @default(false)
+
+  @@index([userId])
+}
+
+model SystemConfig {
+  id            String   @id @default("default")
+  lateEntryTime String   @default("09:00") // HH:mm format
+  earlyExitTime String   @default("17:00") // HH:mm format
+  updatedAt     DateTime @updatedAt
+}
