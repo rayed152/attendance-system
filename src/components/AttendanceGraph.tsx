@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, UserX } from 'lucide-react';
 import { AttendanceRecord } from '../../electron/services/attendance.service';
 
 interface AttendanceGraphProps {
@@ -15,6 +15,7 @@ interface DayPoint {
   exitTime?: number;
   exitLabel?: string;
   exitStatus?: string | null;
+  isAbsent?: boolean;
 }
 
 const CHART_HEIGHT = 200;
@@ -55,6 +56,8 @@ const buildDayPoints = (records: AttendanceRecord[]): DayPoint[] => {
       dp.exitTime = parseHours(r.time);
       dp.exitLabel = r.time.slice(0, 5);
       dp.exitStatus = r.statusFlag;
+    } else if (r.type === 'ABSENT') {
+      dp.isAbsent = true;
     }
   });
 
@@ -71,16 +74,16 @@ export const AttendanceGraph: React.FC<AttendanceGraphProps> = ({ records }) => 
   const dayPoints = buildDayPoints(records);
   const allTimes = dayPoints.flatMap((p) => [p.entryTime, p.exitTime].filter((t): t is number => t !== undefined));
 
-  if (allTimes.length === 0) {
+  if (dayPoints.length === 0) {
     return (
       <div className="p-8 text-center text-slate-400">
-        <p className="font-medium text-sm text-slate-300">No time data available to graph</p>
+        <p className="font-medium text-sm text-slate-300">No data available to graph</p>
       </div>
     );
   }
 
-  const domainMin = Math.max(0, Math.floor(Math.min(...allTimes)) - 1);
-  const domainMax = Math.min(24, Math.ceil(Math.max(...allTimes)) + 1);
+  const domainMin = allTimes.length ? Math.max(0, Math.floor(Math.min(...allTimes)) - 1) : 8;
+  const domainMax = allTimes.length ? Math.min(24, Math.ceil(Math.max(...allTimes)) + 1) : 18;
   const domainRange = Math.max(1, domainMax - domainMin);
 
   const tickStep = domainRange <= 6 ? 1 : domainRange <= 12 ? 2 : 3;
@@ -112,6 +115,10 @@ export const AttendanceGraph: React.FC<AttendanceGraphProps> = ({ records }) => 
           <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
           Early Exit
         </div>
+        <div className="flex items-center gap-2">
+          <UserX className="w-3.5 h-3.5 text-rose-400" />
+          Absent
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -138,6 +145,21 @@ export const AttendanceGraph: React.FC<AttendanceGraphProps> = ({ records }) => 
             {dayPoints.map((dp) => (
               <div key={dp.date} className="flex flex-col items-center gap-2 shrink-0" style={{ width: 44 }}>
                 <div className="relative flex items-end gap-1" style={{ height: CHART_HEIGHT }}>
+                  {dp.isAbsent ? (
+                    /* Absent marker — spans the full column instead of entry/exit bars */
+                    <div className="group relative flex flex-col items-center justify-end w-9" style={{ height: CHART_HEIGHT }}>
+                      <div className="w-full h-full rounded-t-[4px] bg-rose-950/40 border border-rose-900/50 border-b-0 flex flex-col items-center justify-center gap-1.5">
+                        <UserX className="w-4 h-4 text-rose-400" />
+                      </div>
+                      <div className="pointer-events-none absolute bottom-full mb-2 z-10 hidden group-hover:flex flex-col items-center whitespace-nowrap">
+                        <div className="glass-panel rounded-lg px-2.5 py-1.5 text-[11px] shadow-xl border border-slate-700">
+                          <p className="font-bold text-rose-300">Absent</p>
+                          <p className="text-slate-400">{dp.label}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
                   {/* Entry bar */}
                   <div className="group relative flex flex-col items-center justify-end w-4" style={{ height: CHART_HEIGHT }}>
                     {dp.entryTime !== undefined && (
@@ -185,6 +207,8 @@ export const AttendanceGraph: React.FC<AttendanceGraphProps> = ({ records }) => 
                       </>
                     )}
                   </div>
+                    </>
+                  )}
                 </div>
 
                 <span className="text-[10px] font-mono text-slate-500">{dp.label}</span>

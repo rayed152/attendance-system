@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { AttendanceTable } from '../components/AttendanceTable';
-import { SideNav, SideNavItem } from '../components/SideNav';
-import { EditAttendanceModal } from '../components/EditAttendanceModal';
-import { WarnUserModal } from '../components/WarnUserModal';
-import { RegisterUserModal } from '../components/RegisterUserModal';
-import { EditUserModal } from '../components/EditUserModal';
-import { Alert } from '../components/Alert';
+import React, { useState, useEffect } from "react";
+import { AttendanceTable } from "../components/AttendanceTable";
+import { AttendanceCalendar } from "../components/AttendanceCalendar";
+import { SideNav, SideNavItem } from "../components/SideNav";
+import { EditAttendanceModal } from "../components/EditAttendanceModal";
+import { WarnUserModal } from "../components/WarnUserModal";
+import { RegisterUserModal } from "../components/RegisterUserModal";
+import { EditUserModal } from "../components/EditUserModal";
+import { Alert } from "../components/Alert";
 import {
   Users,
   AlertTriangle,
@@ -26,60 +27,72 @@ import {
   LogIn,
   LogOut,
   Loader2,
-} from 'lucide-react';
-import { AttendanceRecord } from '../../electron/services/attendance.service';
+  CalendarDays,
+} from "lucide-react";
+import { AttendanceRecord } from "../../electron/services/attendance.service";
 
 interface UserItem {
   id: string;
   userId: string;
   name: string;
-  role: 'USER' | 'ADMIN';
+  role: "USER" | "ADMIN";
   isBlocked?: boolean;
 }
 
 const adminNavItems: SideNavItem[] = [
-  { id: 'logs', label: 'Attendance Logs', icon: Clock },
-  { id: 'users', label: 'User Management', icon: Users },
-  { id: 'settings', label: 'Company Settings', icon: Building2 },
+  { id: "logs", label: "Attendance Logs", icon: Clock },
+  { id: "users", label: "User Management", icon: Users },
+  { id: "calendar", label: "Calendar", icon: CalendarDays },
+  { id: "settings", label: "Company Settings", icon: Building2 },
   {
-    id: 'theme',
-    label: 'Theme Settings',
+    id: "theme",
+    label: "Theme Settings",
     icon: Palette,
     disabled: true,
-    title: 'Theme customization coming in future update',
+    title: "Theme customization coming in future update",
   },
 ];
 
 export const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'logs' | 'users' | 'settings' | 'theme'>('logs');
+  const [activeTab, setActiveTab] = useState<
+    "logs" | "users" | "calendar" | "settings" | "theme"
+  >("logs");
 
   // Data states
   const [users, setUsers] = useState<UserItem[]>([]);
-  const [userSearchQuery, setUserSearchQuery] = useState<string>('');
-  const [selectedUserFilter, setSelectedUserFilter] = useState<string>('ALL');
+  const [userSearchQuery, setUserSearchQuery] = useState<string>("");
+  const [selectedUserFilter, setSelectedUserFilter] = useState<string>("ALL");
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
 
   // Modals & Active Selections
-  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(null);
+  const [editingRecord, setEditingRecord] = useState<AttendanceRecord | null>(
+    null,
+  );
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
-  const [warningTargetUserId, setWarningTargetUserId] = useState<string | null>(null);
+  const [warningTargetUserId, setWarningTargetUserId] = useState<string | null>(
+    null,
+  );
   const [isWarnModalOpen, setIsWarnModalOpen] = useState<boolean>(false);
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] =
+    useState<boolean>(false);
   const [recordingUserId, setRecordingUserId] = useState<string | null>(null);
 
   // Company Settings & Thresholds
-  const [companyName, setCompanyName] = useState<string>('');
-  const [logoUrl, setLogoUrl] = useState<string>('');
-  const [lateEntryTime, setLateEntryTime] = useState<string>('09:00');
-  const [earlyExitTime, setEarlyExitTime] = useState<string>('17:00');
+  const [companyName, setCompanyName] = useState<string>("");
+  const [logoUrl, setLogoUrl] = useState<string>("");
+  const [lateEntryTime, setLateEntryTime] = useState<string>("09:00");
+  const [earlyExitTime, setEarlyExitTime] = useState<string>("17:00");
 
-  const [alert, setAlert] = useState<{ type: 'error' | 'success' | 'info'; message: string } | null>(null);
+  const [alert, setAlert] = useState<{
+    type: "error" | "success" | "info";
+    message: string;
+  } | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     fetchUsers();
     fetchConfig();
-    fetchAttendanceRecords('ALL');
+    fetchAttendanceRecords("ALL");
   }, []);
 
   const fetchUsers = async () => {
@@ -89,7 +102,7 @@ export const AdminDashboard: React.FC = () => {
         setUsers(res.data);
       }
     } catch (err) {
-      console.error('Error fetching users:', err);
+      console.error("Error fetching users:", err);
     }
   };
 
@@ -97,13 +110,13 @@ export const AdminDashboard: React.FC = () => {
     try {
       const res = await window.electronAPI.admin.getConfig();
       if (res.success && res.data) {
-        setLateEntryTime(res.data.lateEntryTime || '09:00');
-        setEarlyExitTime(res.data.earlyExitTime || '17:00');
+        setLateEntryTime(res.data.lateEntryTime || "09:00");
+        setEarlyExitTime(res.data.earlyExitTime || "17:00");
         if (res.data.companyName) setCompanyName(res.data.companyName);
         if (res.data.logoUrl) setLogoUrl(res.data.logoUrl);
       }
     } catch (err) {
-      console.error('Error fetching config:', err);
+      console.error("Error fetching config:", err);
     }
   };
 
@@ -114,10 +127,13 @@ export const AdminDashboard: React.FC = () => {
       if (res.success && res.data) {
         setRecords(res.data);
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to fetch attendance logs.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to fetch attendance logs.",
+        });
       }
     } catch (err) {
-      console.error('Error fetching attendance logs:', err);
+      console.error("Error fetching attendance logs:", err);
     } finally {
       setLoading(false);
     }
@@ -129,33 +145,55 @@ export const AdminDashboard: React.FC = () => {
     fetchAttendanceRecords(userId);
   };
 
-  const handleRegisterUser = async (input: { userId: string; name: string; password: string; role: 'USER' | 'ADMIN' }) => {
+  const handleRegisterUser = async (input: {
+    userId: string;
+    name: string;
+    password: string;
+    role: "USER" | "ADMIN";
+  }) => {
     try {
       const res = await window.electronAPI.admin.registerUser(input);
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || 'User registered successfully.' });
+        setAlert({
+          type: "success",
+          message: res.message || "User registered successfully.",
+        });
         fetchUsers();
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to register user.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to register user.",
+        });
       }
     } catch (err) {
-      console.error('Error registering user:', err);
-      setAlert({ type: 'error', message: 'Error registering new user.' });
+      console.error("Error registering user:", err);
+      setAlert({ type: "error", message: "Error registering new user." });
     }
   };
 
-  const handleUpdateUser = async (input: { userId: string; name?: string; role?: 'USER' | 'ADMIN'; newPassword?: string }) => {
+  const handleUpdateUser = async (input: {
+    userId: string;
+    name?: string;
+    role?: "USER" | "ADMIN";
+    newPassword?: string;
+  }) => {
     try {
       const res = await window.electronAPI.admin.updateUser(input);
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || 'User info updated.' });
+        setAlert({
+          type: "success",
+          message: res.message || "User info updated.",
+        });
         fetchUsers();
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to update user.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to update user.",
+        });
       }
     } catch (err) {
-      console.error('Error updating user:', err);
-      setAlert({ type: 'error', message: 'Error updating user.' });
+      console.error("Error updating user:", err);
+      setAlert({ type: "error", message: "Error updating user." });
     }
   };
 
@@ -163,100 +201,161 @@ export const AdminDashboard: React.FC = () => {
     try {
       const res = await window.electronAPI.admin.toggleBlockUser(targetUserId);
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || 'User status updated.' });
+        setAlert({
+          type: "success",
+          message: res.message || "User status updated.",
+        });
         fetchUsers();
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to toggle block status.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to toggle block status.",
+        });
       }
     } catch (err) {
-      console.error('Error toggling block status:', err);
-      setAlert({ type: 'error', message: 'Error updating user block status.' });
+      console.error("Error toggling block status:", err);
+      setAlert({ type: "error", message: "Error updating user block status." });
     }
   };
 
-  const handleRecordAttendance = async (targetUserId: string, type: 'ENTRY' | 'EXIT') => {
+  const handleRecordAttendance = async (
+    targetUserId: string,
+    type: "ENTRY" | "EXIT",
+  ) => {
     setRecordingUserId(targetUserId);
     try {
-      const res = await window.electronAPI.admin.recordAttendance({ targetUserId, type });
+      const res = await window.electronAPI.admin.recordAttendance({
+        targetUserId,
+        type,
+      });
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || `${type === 'ENTRY' ? 'Entry' : 'Exit'} recorded.` });
+        setAlert({
+          type: "success",
+          message:
+            res.message || `${type === "ENTRY" ? "Entry" : "Exit"} recorded.`,
+        });
         fetchAttendanceRecords(selectedUserFilter);
       } else {
-        setAlert({ type: 'error', message: res.message || `Failed to record ${type === 'ENTRY' ? 'Entry' : 'Exit'}.` });
+        setAlert({
+          type: "error",
+          message:
+            res.message ||
+            `Failed to record ${type === "ENTRY" ? "Entry" : "Exit"}.`,
+        });
       }
     } catch (err) {
-      console.error('Error recording attendance for user:', err);
-      setAlert({ type: 'error', message: 'Error recording attendance for user.' });
+      console.error("Error recording attendance for user:", err);
+      setAlert({
+        type: "error",
+        message: "Error recording attendance for user.",
+      });
     } finally {
       setRecordingUserId(null);
     }
   };
 
   const handleDeleteUser = async (targetUserId: string) => {
-    if (!window.confirm(`Are you sure you want to kick/delete user "${targetUserId}"? This action cannot be undone.`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to kick/delete user "${targetUserId}"? This action cannot be undone.`,
+      )
+    ) {
       return;
     }
 
     try {
       const res = await window.electronAPI.admin.deleteUser(targetUserId);
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || 'User deleted.' });
+        setAlert({ type: "success", message: res.message || "User deleted." });
         fetchUsers();
         fetchAttendanceRecords(selectedUserFilter);
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to delete user.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to delete user.",
+        });
       }
     } catch (err) {
-      console.error('Error deleting user:', err);
-      setAlert({ type: 'error', message: 'Error deleting user.' });
+      console.error("Error deleting user:", err);
+      setAlert({ type: "error", message: "Error deleting user." });
     }
   };
 
-  const handleSaveEditRecord = async (updated: { id: string; type: 'ENTRY' | 'EXIT'; timestamp: string; note: string }) => {
+  const handleSaveEditRecord = async (updated: {
+    id: string;
+    type: "ENTRY" | "EXIT";
+    timestamp: string;
+    note: string;
+  }) => {
     try {
       const res = await window.electronAPI.admin.updateAttendance(updated);
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || 'Attendance record updated.' });
+        setAlert({
+          type: "success",
+          message: res.message || "Attendance record updated.",
+        });
         fetchAttendanceRecords(selectedUserFilter);
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to update record.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to update record.",
+        });
       }
     } catch (err) {
-      console.error('Error updating attendance:', err);
-      setAlert({ type: 'error', message: 'Error updating attendance record.' });
+      console.error("Error updating attendance:", err);
+      setAlert({ type: "error", message: "Error updating attendance record." });
     }
   };
 
   const handleDeleteAttendanceRecord = async (record: AttendanceRecord) => {
-    if (!window.confirm(`Delete this ${record.type} record (${record.date} ${record.time})? This action cannot be undone.`)) {
+    if (
+      !window.confirm(
+        `Delete this ${record.type} record (${record.date} ${record.time})? This action cannot be undone.`,
+      )
+    ) {
       return;
     }
 
     try {
       const res = await window.electronAPI.admin.deleteAttendance(record.id);
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || 'Attendance record deleted.' });
+        setAlert({
+          type: "success",
+          message: res.message || "Attendance record deleted.",
+        });
         fetchAttendanceRecords(selectedUserFilter);
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to delete record.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to delete record.",
+        });
       }
     } catch (err) {
-      console.error('Error deleting attendance record:', err);
-      setAlert({ type: 'error', message: 'Error deleting attendance record.' });
+      console.error("Error deleting attendance record:", err);
+      setAlert({ type: "error", message: "Error deleting attendance record." });
     }
   };
 
   const handleSendWarning = async (targetUserId: string, message: string) => {
     try {
-      const res = await window.electronAPI.admin.warnUser(targetUserId, message);
+      const res = await window.electronAPI.admin.warnUser(
+        targetUserId,
+        message,
+      );
       if (res.success) {
-        setAlert({ type: 'success', message: res.message || 'Warning issued.' });
+        setAlert({
+          type: "success",
+          message: res.message || "Warning issued.",
+        });
       } else {
-        setAlert({ type: 'error', message: res.message || 'Failed to send warning.' });
+        setAlert({
+          type: "error",
+          message: res.message || "Failed to send warning.",
+        });
       }
     } catch (err) {
-      console.error('Error sending warning:', err);
-      setAlert({ type: 'error', message: 'Error issuing warning.' });
+      console.error("Error sending warning:", err);
+      setAlert({ type: "error", message: "Error issuing warning." });
     }
   };
 
@@ -269,25 +368,37 @@ export const AdminDashboard: React.FC = () => {
       ]);
 
       if (thresholdRes.success && brandingRes.success) {
-        setAlert({ type: 'success', message: 'Company Branding and Shift Thresholds updated successfully.' });
+        setAlert({
+          type: "success",
+          message:
+            "Company Branding and Shift Thresholds updated successfully.",
+        });
         fetchAttendanceRecords(selectedUserFilter);
       } else {
-        setAlert({ type: 'error', message: thresholdRes.message || brandingRes.message || 'Failed to update settings.' });
+        setAlert({
+          type: "error",
+          message:
+            thresholdRes.message ||
+            brandingRes.message ||
+            "Failed to update settings.",
+        });
       }
     } catch (err) {
-      console.error('Error saving settings:', err);
-      setAlert({ type: 'error', message: 'Error saving settings.' });
+      console.error("Error saving settings:", err);
+      setAlert({ type: "error", message: "Error saving settings." });
     }
   };
 
   // Metrics
-  const lateCount = records.filter((r) => r.statusFlag === 'LATE').length;
-  const earlyExitCount = records.filter((r) => r.statusFlag === 'EARLY_EXIT').length;
+  const lateCount = records.filter((r) => r.statusFlag === "LATE").length;
+  const earlyExitCount = records.filter(
+    (r) => r.statusFlag === "EARLY_EXIT",
+  ).length;
 
   const filteredUsersList = users.filter(
     (u) =>
       u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      u.userId.toLowerCase().includes(userSearchQuery.toLowerCase())
+      u.userId.toLowerCase().includes(userSearchQuery.toLowerCase()),
   );
 
   return (
@@ -296,7 +407,11 @@ export const AdminDashboard: React.FC = () => {
       <SideNav
         heading="Admin Control"
         activeId={activeTab}
-        onChange={(id) => setActiveTab(id as 'logs' | 'users' | 'settings' | 'theme')}
+        onChange={(id) =>
+          setActiveTab(
+            id as "logs" | "users" | "calendar" | "settings" | "theme",
+          )
+        }
         items={adminNavItems}
       />
 
@@ -311,14 +426,18 @@ export const AdminDashboard: React.FC = () => {
         )}
 
         {/* TAB 1: ATTENDANCE LOGS */}
-        {activeTab === 'logs' && (
+        {activeTab === "logs" && (
           <div className="space-y-6">
             {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400 font-semibold uppercase">Total Users</p>
-                  <p className="text-2xl font-bold text-white mt-1 font-mono">{users.length}</p>
+                  <p className="text-xs text-slate-400 font-semibold uppercase">
+                    Total Users
+                  </p>
+                  <p className="text-2xl font-bold text-white mt-1 font-mono">
+                    {users.length}
+                  </p>
                 </div>
                 <div className="p-3 bg-sky-950/60 rounded-xl text-sky-400 border border-sky-800/40">
                   <Users className="w-5 h-5" />
@@ -327,8 +446,12 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400 font-semibold uppercase">Total Logs</p>
-                  <p className="text-2xl font-bold text-slate-100 mt-1 font-mono">{records.length}</p>
+                  <p className="text-xs text-slate-400 font-semibold uppercase">
+                    Total Logs
+                  </p>
+                  <p className="text-2xl font-bold text-slate-100 mt-1 font-mono">
+                    {records.length}
+                  </p>
                 </div>
                 <div className="p-3 bg-indigo-950/60 rounded-xl text-indigo-400 border border-indigo-800/40">
                   <FileSpreadsheet className="w-5 h-5" />
@@ -337,8 +460,12 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400 font-semibold uppercase">Late (&gt; {lateEntryTime})</p>
-                  <p className="text-2xl font-bold text-amber-400 mt-1 font-mono">{lateCount}</p>
+                  <p className="text-xs text-slate-400 font-semibold uppercase">
+                    Late (&gt; {lateEntryTime})
+                  </p>
+                  <p className="text-2xl font-bold text-amber-400 mt-1 font-mono">
+                    {lateCount}
+                  </p>
                 </div>
                 <div className="p-3 bg-amber-950/60 rounded-xl text-amber-400 border border-amber-800/40">
                   <AlertTriangle className="w-5 h-5" />
@@ -347,8 +474,12 @@ export const AdminDashboard: React.FC = () => {
 
               <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400 font-semibold uppercase">Early Exits (&lt; {earlyExitTime})</p>
-                  <p className="text-2xl font-bold text-orange-400 mt-1 font-mono">{earlyExitCount}</p>
+                  <p className="text-xs text-slate-400 font-semibold uppercase">
+                    Early Exits (&lt; {earlyExitTime})
+                  </p>
+                  <p className="text-2xl font-bold text-orange-400 mt-1 font-mono">
+                    {earlyExitCount}
+                  </p>
                 </div>
                 <div className="p-3 bg-orange-950/60 rounded-xl text-orange-400 border border-orange-800/40">
                   <AlertTriangle className="w-5 h-5" />
@@ -359,7 +490,9 @@ export const AdminDashboard: React.FC = () => {
             {/* Filter Bar */}
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <label className="text-xs font-semibold text-slate-300 uppercase">Filter User:</label>
+                <label className="text-xs font-semibold text-slate-300 uppercase">
+                  Filter User:
+                </label>
                 <select
                   value={selectedUserFilter}
                   onChange={(e) => handleFilterChange(e.target.value)}
@@ -379,7 +512,9 @@ export const AdminDashboard: React.FC = () => {
                 disabled={loading}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition-all"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`}
+                />
                 Refresh
               </button>
             </div>
@@ -394,7 +529,7 @@ export const AdminDashboard: React.FC = () => {
         )}
 
         {/* TAB 2: USER MANAGEMENT (Register, Edit, Block, Kick) */}
-        {activeTab === 'users' && (
+        {activeTab === "users" && (
           <div className="space-y-6">
             <div className="glass-panel p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative w-full sm:w-72">
@@ -442,7 +577,10 @@ export const AdminDashboard: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {filteredUsersList.map((u) => (
-                      <tr key={u.id} className="hover:bg-slate-800/30 transition-colors">
+                      <tr
+                        key={u.id}
+                        className="hover:bg-slate-800/30 transition-colors"
+                      >
                         <td className="px-6 py-3.5 font-bold text-slate-100">
                           {u.name}
                         </td>
@@ -451,10 +589,11 @@ export const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="px-6 py-3.5 font-mono">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${u.role === 'ADMIN'
-                              ? 'bg-amber-950 text-amber-400 border border-amber-800'
-                              : 'bg-sky-950 text-sky-400 border border-sky-800'
-                              }`}
+                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                              u.role === "ADMIN"
+                                ? "bg-amber-950 text-amber-400 border border-amber-800"
+                                : "bg-sky-950 text-sky-400 border border-sky-800"
+                            }`}
                           >
                             {u.role}
                           </span>
@@ -475,7 +614,9 @@ export const AdminDashboard: React.FC = () => {
                         <td className="px-6 py-3.5 text-right font-mono">
                           <div className="flex items-center justify-end gap-2">
                             <button
-                              onClick={() => handleRecordAttendance(u.userId, 'ENTRY')}
+                              onClick={() =>
+                                handleRecordAttendance(u.userId, "ENTRY")
+                              }
                               disabled={recordingUserId === u.userId}
                               className="px-2 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/60 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Record Entry for this user"
@@ -488,7 +629,9 @@ export const AdminDashboard: React.FC = () => {
                             </button>
 
                             <button
-                              onClick={() => handleRecordAttendance(u.userId, 'EXIT')}
+                              onClick={() =>
+                                handleRecordAttendance(u.userId, "EXIT")
+                              }
                               disabled={recordingUserId === u.userId}
                               className="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Record Exit for this user"
@@ -521,11 +664,16 @@ export const AdminDashboard: React.FC = () => {
 
                             <button
                               onClick={() => handleToggleBlock(u.userId)}
-                              className={`px-2 py-1 rounded border ${u.isBlocked
-                                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800/60'
-                                : 'bg-orange-950/60 text-orange-300 border-orange-800/60'
-                                }`}
-                              title={u.isBlocked ? 'Unblock user' : 'Block / Suspend user'}
+                              className={`px-2 py-1 rounded border ${
+                                u.isBlocked
+                                  ? "bg-emerald-950/60 text-emerald-300 border-emerald-800/60"
+                                  : "bg-orange-950/60 text-orange-300 border-orange-800/60"
+                              }`}
+                              title={
+                                u.isBlocked
+                                  ? "Unblock user"
+                                  : "Block / Suspend user"
+                              }
                             >
                               <Ban className="w-3.5 h-3.5" />
                             </button>
@@ -548,20 +696,30 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
+        {/* TAB: WORKING DAYS & OFF DAYS CALENDAR */}
+        {activeTab === "calendar" && <AttendanceCalendar />}
+
         {/* TAB 3: COMPANY SETTINGS & BRANDING */}
-        {activeTab === 'settings' && (
-          <form onSubmit={handleSaveSettings} className="glass-panel p-8 rounded-2xl border border-slate-800 space-y-6">
+        {activeTab === "settings" && (
+          <form
+            onSubmit={handleSaveSettings}
+            className="glass-panel p-8 rounded-2xl border border-slate-800 space-y-6"
+          >
             <div className="border-b border-slate-800 pb-4">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-sky-400" />
                 Company Branding & Shift Rules
               </h2>
-              <p className="text-xs text-slate-400 mt-1">Configure company name, logo, and work shift thresholds</p>
+              <p className="text-xs text-slate-400 mt-1">
+                Configure company name, logo, and work shift thresholds
+              </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase text-slate-300 mb-1">Company Display Name</label>
+                <label className="block text-xs font-semibold uppercase text-slate-300 mb-1">
+                  Company Display Name
+                </label>
                 <input
                   type="text"
                   value={companyName}
@@ -598,7 +756,9 @@ export const AdminDashboard: React.FC = () => {
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-sm outline-none focus:border-amber-500"
                     required
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">Entries after this time are tagged LATE</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Entries after this time are tagged LATE
+                  </p>
                 </div>
 
                 <div>
@@ -613,7 +773,9 @@ export const AdminDashboard: React.FC = () => {
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-100 font-mono text-sm outline-none focus:border-orange-500"
                     required
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">Exits before this time are tagged EARLY EXIT</p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Exits before this time are tagged EARLY EXIT
+                  </p>
                 </div>
               </div>
             </div>
@@ -659,7 +821,9 @@ export const AdminDashboard: React.FC = () => {
           setIsWarnModalOpen(false);
           setWarningTargetUserId(null);
         }}
-        onSendWarning={(userId, message) => handleSendWarning(userId || warningTargetUserId!, message)}
+        onSendWarning={(userId, message) =>
+          handleSendWarning(userId || warningTargetUserId!, message)
+        }
       />
     </div>
   );

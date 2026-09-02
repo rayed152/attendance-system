@@ -8,6 +8,7 @@ import {
   Edit2,
   Trash2,
   User,
+  UserX,
   BarChart3,
   ListChecks,
   ChevronLeft,
@@ -115,13 +116,14 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
               <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
                 {pagedRecords.map((record) => {
                   const isEntry = record.type === "ENTRY";
+                  const isAbsent = record.type === "ABSENT";
                   const isLate = record.statusFlag === "LATE";
                   const isEarlyExit = record.statusFlag === "EARLY_EXIT";
 
                   return (
                     <tr
                       key={record.id}
-                      className="hover:bg-slate-800/30 transition-colors"
+                      className={`hover:bg-slate-800/30 transition-colors ${isAbsent ? "opacity-80" : ""}`}
                     >
                       {showUserColumn && (
                         <td className="px-6 py-3.5 text-slate-200">
@@ -144,27 +146,40 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       </td>
 
                       <td className="px-6 py-3.5">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            isEntry
-                              ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800/60"
-                              : "bg-rose-950/80 text-rose-300 border border-rose-800/60"
-                          }`}
-                        >
-                          {isEntry ? (
-                            <LogIn className="w-3.5 h-3.5" />
-                          ) : (
-                            <LogOutIcon className="w-3.5 h-3.5" />
-                          )}
-                          {record.type}
-                        </span>
+                        {isAbsent ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-800/80 text-slate-400 border border-slate-700">
+                            <UserX className="w-3.5 h-3.5" />
+                            ABSENT
+                          </span>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              isEntry
+                                ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800/60"
+                                : "bg-rose-950/80 text-rose-300 border border-rose-800/60"
+                            }`}
+                          >
+                            {isEntry ? (
+                              <LogIn className="w-3.5 h-3.5" />
+                            ) : (
+                              <LogOutIcon className="w-3.5 h-3.5" />
+                            )}
+                            {record.type}
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-6 py-3.5 text-slate-200 font-bold tracking-wide">
-                        {record.time}
+                        {isAbsent ? <span className="text-slate-600">—</span> : record.time}
                       </td>
 
                       <td className="px-6 py-3.5">
+                        {isAbsent && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-950 text-rose-400 border border-rose-800/80">
+                            <UserX className="w-3 h-3 text-rose-400" />
+                            ABSENT
+                          </span>
+                        )}
                         {isLate && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-950 text-amber-400 border border-amber-800/80">
                             <AlertTriangle className="w-3 h-3 text-amber-400" />
@@ -177,7 +192,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                             EARLY EXIT (&lt; 5 PM)
                           </span>
                         )}
-                        {!isLate && !isEarlyExit && (
+                        {!isAbsent && !isLate && !isEarlyExit && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                             ON TIME
                           </span>
@@ -185,13 +200,13 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                       </td>
 
                       <td className="px-6 py-3.5 text-slate-400 italic font-sans text-xs max-w-xs truncate">
-                        {record.note || "—"}
+                        {isAbsent ? "No attendance recorded" : record.note || "—"}
                       </td>
 
                       {(onEditRecord || onDeleteRecord) && (
                         <td className="px-6 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            {onEditRecord && (
+                            {!isAbsent && onEditRecord && (
                               <button
                                 onClick={() => onEditRecord(record)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-950/60 hover:bg-sky-900/80 border border-sky-800/60 text-sky-300 text-xs font-semibold transition-all"
@@ -201,7 +216,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                               </button>
                             )}
 
-                            {onDeleteRecord && (
+                            {!isAbsent && onDeleteRecord && (
                               <button
                                 onClick={() => onDeleteRecord(record)}
                                 className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900/80 border border-rose-800/60 text-rose-300 text-xs font-semibold transition-all"

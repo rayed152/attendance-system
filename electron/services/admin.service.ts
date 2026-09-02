@@ -318,7 +318,11 @@ export class AdminService {
 
       const formatted = records.map((rec) => this.attendanceService.formatRecord(rec));
 
-      return { success: true, data: formatted };
+      const absenceTargetUserId = targetUserId && targetUserId !== 'ALL' ? targetUserId : undefined;
+      const absences = await this.attendanceService.getAbsenceRecordsForRange(sessionUser!.organizationId, absenceTargetUserId);
+      const merged = [...formatted, ...absences].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+
+      return { success: true, data: merged };
     } catch (error: any) {
       console.error('AdminService.getAllAttendance error:', error);
       return { success: false, message: error?.message || 'Failed to fetch attendance records.' };
@@ -468,6 +472,147 @@ export class AdminService {
     } catch (error: any) {
       console.error('AdminService.recordAttendanceForUser error:', error);
       return { success: false, message: error?.message || 'Failed to record attendance for user.' };
+    }
+  }
+
+  /**
+   * Set the organization's weekly working-day pattern (e.g. Mon-Fri).
+   */
+  async updateWorkingDays(sessionUser: UserSession | null, workingDays: number[]) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    const cleaned = Array.from(new Set((workingDays || []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))).sort();
+    if (cleaned.length === 0) {
+      return { success: false, message: 'Select at least one working day.' };
+    }
+
+    try {
+      const workingDaysStr = cleaned.join(',');
+      const updated = await this.prisma.systemConfig.upsert({
+        where: { organizationId: sessionUser!.organizationId },
+        update: { workingDays: workingDaysStr },
+        create: {
+          organizationId: sessionUser!.organizationId,
+          workingDays: workingDaysStr,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Working days updated successfully.',
+        data: { workingDays: cleaned, updatedAt: updated.updatedAt },
+      };
+    } catch (error: any) {
+      console.error('AdminService.updateWorkingDays error:', error);
+      return { success: false, message: error?.message || 'Failed to update working days.' };
+    }
+  }
+
+  /**
+   * List ad-hoc Off Days (holidays) for a given month ("YYYY-MM").
+   */
+  async getOffDays(sessionUser: UserSession | null, month: string) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+      return { success: false, message: 'A valid month (YYYY-MM) is required.' };
+    }
+
+    try {
+      const offDays = await this.prisma.offDay.findMany({
+        where: {
+          organizationId: sessionUser!.organizationId,
+          date: { startsWith: month },
+        },
+        orderBy: { date: 'asc' },
+      });
+
+      return { success: true, data: offDays };
+    } catch (error: any) {
+      console.error('AdminService.getOffDays error:', error);
+      return { success: false, message: error?.message || 'Failed to fetch off days.' };
+    }
+  }
+
+  /**
+   * Mark a specific calendar date as an Off Day (holiday) for the org.
+   */
+  async setOffDay(sessionUser: UserSession | null, date: string, label?: string) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { success: false, message: 'A valid date (YYYY-MM-DD) is required.' };
+    }
+
+    try {
+      const offDay = await this.prisma.offDay.upsert({
+        where: { organizationId_date: { organizationId: sessionUser!.organizationId, date } },
+        update: { label: label?.trim() || 'Holiday' },
+        create: {
+          organizationId: sessionUser!.organizationId,
+          date,
+          label: label?.trim() || 'Holiday',
+        },
+      });
+
+      return { success: true, message: `${date} marked as an Off Day.`, data: offDay };
+    } catch (error: any) {
+      console.error('AdminService.setOffDay error:', error);
+      return { success: false, message: error?.message || 'Failed to set off day.' };
+    }
+  }
+
+  /**
+   * Remove an Off Day override for a specific calendar date, so it reverts
+   * to the normal weekly working-day pattern.
+   */
+  async removeOffDay(sessionUser: UserSession | null, date: string) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    try {
+      await this.prisma.offDay.deleteMany({
+        where: { organizationId: sessionUser!.organizationId, date },
+      });
+
+      return { success: true, message: `${date} off-day override removed.` };
+    } catch (error: any) {
+      console.error('AdminService.removeOffDay error:', error);
+      return { success: false, message: error?.message || 'Failed to remove off day.' };
+    }
+  }
+
+  /**
+   * Users absent on a given working day (no ENTRY recorded). Empty on
+   * non-working days, since absence isn't tracked when nobody is expected in.
+   */
+  async getAbsentUsers(sessionUser: UserSession | null, date: string) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { success: false, message: 'A valid date (YYYY-MM-DD) is required.' };
+    }
+
+    try {
+      const result = await this.attendanceService.getAbsentUsers(sessionUser!.organizationId, date);
+      return { success: true, data: result };
+    } catch (error: any) {
+      console.error('AdminService.getAbsentUsers error:', error);
+      return { success: false, message: error?.message || 'Failed to compute absent users.' };
     }
   }
 

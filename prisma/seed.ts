@@ -27,10 +27,12 @@ async function main() {
   });
 
   // Seed Acme SystemConfig
+  // workingDays is reset explicitly (Mon-Fri) so the seeded absence data
+  // below is deterministic even if it was changed via the admin Calendar UI.
   await prisma.systemConfig.upsert({
     where: { organizationId: acmeOrg.id },
-    update: { lateEntryTime: '09:00', earlyExitTime: '17:00' },
-    create: { organizationId: acmeOrg.id, lateEntryTime: '09:00', earlyExitTime: '17:00' },
+    update: { lateEntryTime: '09:00', earlyExitTime: '17:00', workingDays: '1,2,3,4,5' },
+    create: { organizationId: acmeOrg.id, lateEntryTime: '09:00', earlyExitTime: '17:00', workingDays: '1,2,3,4,5' },
   });
 
   // Seed Acme Users
@@ -78,9 +80,15 @@ async function main() {
 
   // Seed example Attendance History for the Acme Admin account, so the
   // Dashboard's attendance graph/logs toggle has varied data to render
-  // (different dates, different entry/exit times, mixed punctuality).
-  // Only the last 6 days are used (today is left clear) so the seeded
-  // account can still exercise the live Entry/Exit buttons afterward.
+  // (different dates, different entry/exit times, mixed punctuality, and
+  // a couple of deliberate no-shows to demo the Absent tracking feature).
+  // Only the last 13 days are used (today is left clear) so the seeded
+  // account can still exercise the live Entry/Exit buttons afterward, and
+  // everything stays inside the 14-day window the absence feature scans.
+  //
+  // Days 12 and 8 ago (both Mon-Fri working days) are intentionally left
+  // with NO records at all -> AttendanceService.getAbsenceRecordsForRange
+  // will report those as ABSENT for this account.
   const daysAgo = (n: number, hour: number, minute: number): Date => {
     const d = new Date();
     d.setDate(d.getDate() - n);
@@ -93,6 +101,14 @@ async function main() {
   });
 
   const adminAttendanceHistory: { type: AttendanceType; statusFlag: string; timestamp: Date }[] = [
+    { type: AttendanceType.ENTRY, statusFlag: 'ON_TIME', timestamp: daysAgo(13, 8, 50) },
+    { type: AttendanceType.EXIT, statusFlag: 'ON_TIME', timestamp: daysAgo(13, 17, 15) },
+    // daysAgo(12) intentionally has no records -> shows as ABSENT
+    { type: AttendanceType.ENTRY, statusFlag: 'LATE', timestamp: daysAgo(9, 9, 15) },
+    { type: AttendanceType.EXIT, statusFlag: 'ON_TIME', timestamp: daysAgo(9, 17, 20) },
+    // daysAgo(8) intentionally has no records -> shows as ABSENT
+    { type: AttendanceType.ENTRY, statusFlag: 'ON_TIME', timestamp: daysAgo(7, 8, 40) },
+    { type: AttendanceType.EXIT, statusFlag: 'EARLY_EXIT', timestamp: daysAgo(7, 16, 50) },
     { type: AttendanceType.ENTRY, statusFlag: 'ON_TIME', timestamp: daysAgo(6, 8, 45) },
     { type: AttendanceType.EXIT, statusFlag: 'ON_TIME', timestamp: daysAgo(6, 17, 10) },
     { type: AttendanceType.ENTRY, statusFlag: 'LATE', timestamp: daysAgo(5, 9, 20) },
@@ -188,7 +204,8 @@ async function main() {
   console.log(`   License Key: ${acmeOrg.licenseKey}`);
   console.log(`   - Employee: ${user1.name} (${user1.userId}) | Pass: password123`);
   console.log(`   - Admin:    ${admin1.name} (${admin1.userId}) | Pass: admin123`);
-  console.log(`     -> Seeded with ${adminAttendanceHistory.length} example Attendance records (last 6 days, mixed punctuality) for graph/logs demo purposes.`);
+  console.log(`     -> Seeded with ${adminAttendanceHistory.length} example Attendance records over the last 13 days (mixed punctuality) for graph/logs demo purposes.`);
+  console.log(`     -> Days 8 and 12 ago were left with no records -> should show as ABSENT (working days = Mon-Fri).`);
   console.log(`\n🏢 Organization 2: ${globexOrg.name} [Verified: ${globexOrg.isVerified}]`);
   console.log(`   License Key: ${globexOrg.licenseKey}`);
   console.log(`   - Employee: ${user2.name} (${user2.userId}) | Pass: password123`);

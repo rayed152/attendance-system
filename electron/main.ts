@@ -160,6 +160,32 @@ function registerIpcHandlers() {
     return await adminService.recordAttendanceForUser(user, input);
   });
 
+  ipcMain.handle('admin:updateWorkingDays', async (_event, workingDays: number[]) => {
+    const user = authService.getCurrentSession();
+    return await adminService.updateWorkingDays(user, workingDays);
+  });
+
+  ipcMain.handle('admin:getOffDays', async (_event, month: string) => {
+    const user = authService.getCurrentSession();
+    return await adminService.getOffDays(user, month);
+  });
+
+  ipcMain.handle('admin:setOffDay', async (_event, data) => {
+    const user = authService.getCurrentSession();
+    const { date, label } = data || {};
+    return await adminService.setOffDay(user, date, label);
+  });
+
+  ipcMain.handle('admin:removeOffDay', async (_event, date: string) => {
+    const user = authService.getCurrentSession();
+    return await adminService.removeOffDay(user, date);
+  });
+
+  ipcMain.handle('admin:getAbsentUsers', async (_event, date: string) => {
+    const user = authService.getCurrentSession();
+    return await adminService.getAbsentUsers(user, date);
+  });
+
   ipcMain.handle('admin:warnUser', async (_event, data) => {
     const user = authService.getCurrentSession();
     const { targetUserId, message } = data || {};

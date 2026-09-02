@@ -23,7 +23,7 @@ export const EditAttendanceModal: React.FC<EditAttendanceModalProps> = ({
 
   useEffect(() => {
     if (record) {
-      setType(record.type);
+      setType(record.type === 'ABSENT' ? 'ENTRY' : record.type);
       setDate(record.date);
       setTime(record.time);
       setNote(record.note || '');

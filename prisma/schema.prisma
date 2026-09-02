@@ -31,6 +31,7 @@ model Organization {
   attendances Attendance[]
   warnings    Warning[]
   config      SystemConfig?
+  offDays     OffDay[]
 }
 
 model User {
@@ -90,5 +91,18 @@ model SystemConfig {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   lateEntryTime  String       @default("09:00") // HH:mm format
   earlyExitTime  String       @default("17:00") // HH:mm format
+  workingDays    String       @default("1,2,3,4,5") // comma-separated weekdays considered working (0=Sun..6=Sat)
   updatedAt      DateTime     @updatedAt
+}
+
+model OffDay {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  date           String       // YYYY-MM-DD, calendar-specific off day (holiday) set by an admin
+  label          String?      // e.g. "Public Holiday"
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, date])
+  @@index([organizationId])
 }

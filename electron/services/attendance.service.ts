@@ -7,7 +7,7 @@ export interface AttendanceRecord {
   organizationId: string;
   userId: string;
   userName?: string;
-  type: 'ENTRY' | 'EXIT';
+  type: 'ENTRY' | 'EXIT' | 'ABSENT';
   statusFlag?: string | null;
   note?: string | null;
   timestamp: string;
@@ -15,10 +15,32 @@ export interface AttendanceRecord {
   time: string;
 }
 
+// How many recent days to scan for synthetic ABSENT rows when building
+// logs/graph data — matches AttendanceGraph's own recent-days window, so
+// what shows in the graph and what shows in the logs stay in sync.
+const ABSENCE_WINDOW_DAYS = 14;
+
 export interface SystemConfigData {
   lateEntryTime: string;
   earlyExitTime: string;
+  workingDays: number[]; // 0=Sun .. 6=Sat
 }
+
+export interface AbsentUser {
+  userId: string;
+  name: string;
+}
+
+const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5]; // Mon-Fri
+
+const parseWorkingDays = (raw: string | null | undefined): number[] => {
+  if (!raw) return DEFAULT_WORKING_DAYS;
+  const parsed = raw
+    .split(',')
+    .map((d) => parseInt(d.trim(), 10))
+    .filter((d) => !isNaN(d) && d >= 0 && d <= 6);
+  return parsed.length > 0 ? parsed : DEFAULT_WORKING_DAYS;
+};
 
 export interface AttendanceResponse {
   success: boolean;
@@ -49,7 +71,7 @@ export class AttendanceService {
       }
 
       if (!targetOrgId) {
-        return { lateEntryTime: '09:00', earlyExitTime: '17:00' };
+        return { lateEntryTime: '09:00', earlyExitTime: '17:00', workingDays: DEFAULT_WORKING_DAYS };
       }
 
       let config = await this.prisma.systemConfig.findUnique({
@@ -69,10 +91,11 @@ export class AttendanceService {
       return {
         lateEntryTime: config.lateEntryTime || '09:00',
         earlyExitTime: config.earlyExitTime || '17:00',
+        workingDays: parseWorkingDays(config.workingDays),
       };
     } catch (err) {
       console.error('AttendanceService.getConfig error:', err);
-      return { lateEntryTime: '09:00', earlyExitTime: '17:00' };
+      return { lateEntryTime: '09:00', earlyExitTime: '17:00', workingDays: DEFAULT_WORKING_DAYS };
     }
   }
 
@@ -85,6 +108,115 @@ export class AttendanceService {
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
     return { start, end };
+  }
+
+  /**
+   * UTC-day [start, end) bounds for a YYYY-MM-DD string, matching the same
+   * UTC-based date convention used by formatRecord()'s `date` field.
+   */
+  private dateStrToUtcRange(dateStr: string): { start: Date; end: Date } {
+    const start = new Date(`${dateStr}T00:00:00.000Z`);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return { start, end };
+  }
+
+  /**
+   * Whether the given date is a working day for the organization: its
+   * weekday must be in the configured working days, and it must not have
+   * been marked as an ad-hoc Off Day (holiday) by an admin.
+   */
+  async isWorkingDay(organizationId: string, dateStr: string): Promise<{ isWorkingDay: boolean; offDayLabel?: string | null }> {
+    const offDay = await this.prisma.offDay.findUnique({
+      where: { organizationId_date: { organizationId, date: dateStr } },
+    });
+
+    if (offDay) {
+      return { isWorkingDay: false, offDayLabel: offDay.label };
+    }
+
+    const config = await this.getConfig(organizationId);
+    const weekday = new Date(`${dateStr}T00:00:00.000Z`).getUTCDay();
+
+    return { isWorkingDay: config.workingDays.includes(weekday) };
+  }
+
+  /**
+   * Users who have no ENTRY record on a given working day (i.e. absent).
+   * Returns an empty list (with isWorkingDay: false) for non-working days,
+   * since absence isn't tracked on days off.
+   */
+  async getAbsentUsers(organizationId: string, dateStr: string): Promise<{ isWorkingDay: boolean; offDayLabel?: string | null; absentUsers: AbsentUser[] }> {
+    const dayCheck = await this.isWorkingDay(organizationId, dateStr);
+    if (!dayCheck.isWorkingDay) {
+      return { ...dayCheck, absentUsers: [] };
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (dateStr > todayStr) {
+      return { ...dayCheck, absentUsers: [] };
+    }
+
+    const { start, end } = this.dateStrToUtcRange(dateStr);
+
+    const [allUsers, presentEntries] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { organizationId, isBlocked: false },
+        select: { userId: true, name: true },
+      }),
+      this.prisma.attendance.findMany({
+        where: {
+          organizationId,
+          type: AttendanceType.ENTRY,
+          timestamp: { gte: start, lt: end },
+        },
+        select: { userId: true },
+      }),
+    ]);
+
+    const presentUserIds = new Set(presentEntries.map((r) => r.userId));
+    const absentUsers = allUsers.filter((u) => !presentUserIds.has(u.userId));
+
+    return { ...dayCheck, absentUsers };
+  }
+
+  /**
+   * Synthetic ABSENT rows for the recent ABSENCE_WINDOW_DAYS window, one per
+   * (user, missed working day). Used to surface absences alongside real
+   * ENTRY/EXIT rows in the attendance logs table and graph. Restricted to a
+   * recent window rather than full history, since scanning a user's entire
+   * tenure day-by-day would be unbounded and mostly not useful to show.
+   */
+  async getAbsenceRecordsForRange(organizationId: string, targetUserId?: string, days: number = ABSENCE_WINDOW_DAYS): Promise<AttendanceRecord[]> {
+    const absenceRecords: AttendanceRecord[] = [];
+    const now = new Date();
+
+    for (let i = 0; i < days; i++) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+      const dateStr = d.toISOString().split('T')[0];
+
+      const { isWorkingDay: isWorking, absentUsers } = await this.getAbsentUsers(organizationId, dateStr);
+      if (!isWorking) continue;
+
+      const scoped = targetUserId ? absentUsers.filter((u) => u.userId === targetUserId) : absentUsers;
+
+      for (const u of scoped) {
+        absenceRecords.push({
+          id: `absent-${u.userId}-${dateStr}`,
+          organizationId,
+          userId: u.userId,
+          userName: u.name,
+          type: 'ABSENT',
+          statusFlag: 'ABSENT',
+          note: null,
+          timestamp: `${dateStr}T00:00:00.000Z`,
+          date: dateStr,
+          time: '--:--:--',
+        });
+      }
+    }
+
+    return absenceRecords;
   }
 
   /**
@@ -337,10 +469,12 @@ export class AttendanceService {
       });
 
       const formatted = records.map((rec) => this.formatRecord(rec));
+      const absences = await this.getAbsenceRecordsForRange(sessionUser.organizationId, sessionUser.userId);
+      const merged = [...formatted, ...absences].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
 
       return {
         success: true,
-        data: formatted,
+        data: merged,
       };
     } catch (error: any) {
       console.error('AttendanceService.getHistory error:', error);

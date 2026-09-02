@@ -38,6 +38,11 @@ const electronAPI = {
     deleteAttendance: (id: string) => ipcRenderer.invoke('admin:deleteAttendance', id),
     recordAttendance: (input: { targetUserId: string; type: 'ENTRY' | 'EXIT' }) =>
       ipcRenderer.invoke('admin:recordAttendance', input),
+    updateWorkingDays: (workingDays: number[]) => ipcRenderer.invoke('admin:updateWorkingDays', workingDays),
+    getOffDays: (month: string) => ipcRenderer.invoke('admin:getOffDays', month),
+    setOffDay: (input: { date: string; label?: string }) => ipcRenderer.invoke('admin:setOffDay', input),
+    removeOffDay: (date: string) => ipcRenderer.invoke('admin:removeOffDay', date),
+    getAbsentUsers: (date: string) => ipcRenderer.invoke('admin:getAbsentUsers', date),
     warnUser: (targetUserId: string, message: string) =>
       ipcRenderer.invoke('admin:warnUser', { targetUserId, message }),
     getConfig: () => ipcRenderer.invoke('admin:getConfig'),
