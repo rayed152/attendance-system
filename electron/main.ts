@@ -150,6 +150,16 @@ function registerIpcHandlers() {
     return await adminService.updateAttendance(user, input);
   });
 
+  ipcMain.handle('admin:deleteAttendance', async (_event, id: string) => {
+    const user = authService.getCurrentSession();
+    return await adminService.deleteAttendance(user, id);
+  });
+
+  ipcMain.handle('admin:recordAttendance', async (_event, input) => {
+    const user = authService.getCurrentSession();
+    return await adminService.recordAttendanceForUser(user, input);
+  });
+
   ipcMain.handle('admin:warnUser', async (_event, data) => {
     const user = authService.getCurrentSession();
     const { targetUserId, message } = data || {};

@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Role, AttendanceType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -76,6 +76,47 @@ async function main() {
     },
   });
 
+  // Seed example Attendance History for the Acme Admin account, so the
+  // Dashboard's attendance graph/logs toggle has varied data to render
+  // (different dates, different entry/exit times, mixed punctuality).
+  // Only the last 6 days are used (today is left clear) so the seeded
+  // account can still exercise the live Entry/Exit buttons afterward.
+  const daysAgo = (n: number, hour: number, minute: number): Date => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+
+  await prisma.attendance.deleteMany({
+    where: { organizationId: acmeOrg.id, userId: admin1.userId },
+  });
+
+  const adminAttendanceHistory: { type: AttendanceType; statusFlag: string; timestamp: Date }[] = [
+    { type: AttendanceType.ENTRY, statusFlag: 'ON_TIME', timestamp: daysAgo(6, 8, 45) },
+    { type: AttendanceType.EXIT, statusFlag: 'ON_TIME', timestamp: daysAgo(6, 17, 10) },
+    { type: AttendanceType.ENTRY, statusFlag: 'LATE', timestamp: daysAgo(5, 9, 20) },
+    { type: AttendanceType.EXIT, statusFlag: 'EARLY_EXIT', timestamp: daysAgo(5, 16, 45) },
+    { type: AttendanceType.ENTRY, statusFlag: 'ON_TIME', timestamp: daysAgo(4, 8, 55) },
+    { type: AttendanceType.EXIT, statusFlag: 'ON_TIME', timestamp: daysAgo(4, 17, 30) },
+    { type: AttendanceType.ENTRY, statusFlag: 'LATE', timestamp: daysAgo(3, 9, 5) },
+    { type: AttendanceType.EXIT, statusFlag: 'ON_TIME', timestamp: daysAgo(3, 17, 0) },
+    { type: AttendanceType.ENTRY, statusFlag: 'ON_TIME', timestamp: daysAgo(2, 8, 30) },
+    { type: AttendanceType.EXIT, statusFlag: 'EARLY_EXIT', timestamp: daysAgo(2, 16, 15) },
+    { type: AttendanceType.ENTRY, statusFlag: 'LATE', timestamp: daysAgo(1, 9, 45) },
+    { type: AttendanceType.EXIT, statusFlag: 'ON_TIME', timestamp: daysAgo(1, 17, 45) },
+  ];
+
+  await prisma.attendance.createMany({
+    data: adminAttendanceHistory.map((rec) => ({
+      organizationId: acmeOrg.id,
+      userId: admin1.userId,
+      type: rec.type,
+      statusFlag: rec.statusFlag,
+      timestamp: rec.timestamp,
+    })),
+  });
+
   // Seed Globex Inc (Verified)
   const globexOrg = await prisma.organization.upsert({
     where: { companyCode: 'globex' },
@@ -147,6 +188,7 @@ async function main() {
   console.log(`   License Key: ${acmeOrg.licenseKey}`);
   console.log(`   - Employee: ${user1.name} (${user1.userId}) | Pass: password123`);
   console.log(`   - Admin:    ${admin1.name} (${admin1.userId}) | Pass: admin123`);
+  console.log(`     -> Seeded with ${adminAttendanceHistory.length} example Attendance records (last 6 days, mixed punctuality) for graph/logs demo purposes.`);
   console.log(`\n🏢 Organization 2: ${globexOrg.name} [Verified: ${globexOrg.isVerified}]`);
   console.log(`   License Key: ${globexOrg.licenseKey}`);
   console.log(`   - Employee: ${user2.name} (${user2.userId}) | Pass: password123`);

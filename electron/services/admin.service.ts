@@ -3,6 +3,11 @@ import bcrypt from 'bcryptjs';
 import { UserSession } from './auth.service';
 import { AttendanceService } from './attendance.service';
 
+export interface RecordAttendanceInput {
+  targetUserId: string;
+  type: 'ENTRY' | 'EXIT';
+}
+
 export interface UpdateAttendanceInput {
   id: string;
   type?: 'ENTRY' | 'EXIT';
@@ -367,6 +372,102 @@ export class AdminService {
     } catch (error: any) {
       console.error('AdminService.updateAttendance error:', error);
       return { success: false, message: error?.message || 'Failed to update attendance record.' };
+    }
+  }
+
+  /**
+   * Delete an attendance record in Admin's Organization
+   */
+  async deleteAttendance(sessionUser: UserSession | null, id: string) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    if (!id) {
+      return { success: false, message: 'Attendance record ID is required.' };
+    }
+
+    try {
+      const existing = await this.prisma.attendance.findFirst({
+        where: { id, organizationId: sessionUser!.organizationId },
+      });
+
+      if (!existing) {
+        return { success: false, message: 'Attendance record not found in your organization.' };
+      }
+
+      await this.prisma.attendance.delete({ where: { id } });
+
+      return {
+        success: true,
+        message: 'Attendance record deleted successfully.',
+      };
+    } catch (error: any) {
+      console.error('AdminService.deleteAttendance error:', error);
+      return { success: false, message: error?.message || 'Failed to delete attendance record.' };
+    }
+  }
+
+  /**
+   * Record an Entry or Exit on behalf of a user in Admin's Organization
+   * (e.g. the user forgot to check in/out themselves). Goes through the
+   * same AttendanceService rules as a self-recorded Entry/Exit (checked-in
+   * state, one Entry + one Exit per day), just attributed to the target user.
+   */
+  async recordAttendanceForUser(sessionUser: UserSession | null, input: RecordAttendanceInput) {
+    const authCheck = this.verifyAdmin(sessionUser);
+    if (!authCheck.valid) {
+      return { success: false, message: authCheck.message };
+    }
+
+    const { targetUserId, type } = input || ({} as RecordAttendanceInput);
+    if (!targetUserId || (type !== 'ENTRY' && type !== 'EXIT')) {
+      return { success: false, message: 'Target User ID and a valid attendance type (ENTRY/EXIT) are required.' };
+    }
+
+    try {
+      const targetUser = await this.prisma.user.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: sessionUser!.organizationId,
+            userId: targetUserId,
+          },
+        },
+      });
+
+      if (!targetUser) {
+        return { success: false, message: 'Target user does not exist in your organization.' };
+      }
+
+      if (targetUser.isBlocked) {
+        return { success: false, message: `Cannot record attendance: "${targetUser.name}" is currently blocked.` };
+      }
+
+      const targetSession: UserSession = {
+        id: targetUser.id,
+        organizationId: sessionUser!.organizationId,
+        companyName: sessionUser!.companyName,
+        userId: targetUser.userId,
+        name: targetUser.name,
+        role: targetUser.role,
+      };
+
+      const result = type === 'ENTRY'
+        ? await this.attendanceService.recordEntry(targetSession)
+        : await this.attendanceService.recordExit(targetSession);
+
+      if (!result.success) {
+        return result;
+      }
+
+      return {
+        ...result,
+        message: `${type === 'ENTRY' ? 'Entry' : 'Exit'} recorded for ${targetUser.name} (${targetUser.userId}) by admin.`,
+      };
+    } catch (error: any) {
+      console.error('AdminService.recordAttendanceForUser error:', error);
+      return { success: false, message: error?.message || 'Failed to record attendance for user.' };
     }
   }
 

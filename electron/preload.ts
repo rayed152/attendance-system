@@ -35,6 +35,9 @@ const electronAPI = {
       ipcRenderer.invoke('admin:getAllAttendance', targetUserId),
     updateAttendance: (input: { id: string; type?: 'ENTRY' | 'EXIT'; timestamp?: string; note?: string }) =>
       ipcRenderer.invoke('admin:updateAttendance', input),
+    deleteAttendance: (id: string) => ipcRenderer.invoke('admin:deleteAttendance', id),
+    recordAttendance: (input: { targetUserId: string; type: 'ENTRY' | 'EXIT' }) =>
+      ipcRenderer.invoke('admin:recordAttendance', input),
     warnUser: (targetUserId: string, message: string) =>
       ipcRenderer.invoke('admin:warnUser', { targetUserId, message }),
     getConfig: () => ipcRenderer.invoke('admin:getConfig'),

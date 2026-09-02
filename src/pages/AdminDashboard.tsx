@@ -23,6 +23,9 @@ import {
   CheckCircle2,
   Image as ImageIcon,
   Save,
+  LogIn,
+  LogOut,
+  Loader2,
 } from 'lucide-react';
 import { AttendanceRecord } from '../../electron/services/attendance.service';
 
@@ -62,6 +65,7 @@ export const AdminDashboard: React.FC = () => {
   const [warningTargetUserId, setWarningTargetUserId] = useState<string | null>(null);
   const [isWarnModalOpen, setIsWarnModalOpen] = useState<boolean>(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState<boolean>(false);
+  const [recordingUserId, setRecordingUserId] = useState<string | null>(null);
 
   // Company Settings & Thresholds
   const [companyName, setCompanyName] = useState<string>('');
@@ -170,6 +174,24 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleRecordAttendance = async (targetUserId: string, type: 'ENTRY' | 'EXIT') => {
+    setRecordingUserId(targetUserId);
+    try {
+      const res = await window.electronAPI.admin.recordAttendance({ targetUserId, type });
+      if (res.success) {
+        setAlert({ type: 'success', message: res.message || `${type === 'ENTRY' ? 'Entry' : 'Exit'} recorded.` });
+        fetchAttendanceRecords(selectedUserFilter);
+      } else {
+        setAlert({ type: 'error', message: res.message || `Failed to record ${type === 'ENTRY' ? 'Entry' : 'Exit'}.` });
+      }
+    } catch (err) {
+      console.error('Error recording attendance for user:', err);
+      setAlert({ type: 'error', message: 'Error recording attendance for user.' });
+    } finally {
+      setRecordingUserId(null);
+    }
+  };
+
   const handleDeleteUser = async (targetUserId: string) => {
     if (!window.confirm(`Are you sure you want to kick/delete user "${targetUserId}"? This action cannot be undone.`)) {
       return;
@@ -202,6 +224,25 @@ export const AdminDashboard: React.FC = () => {
     } catch (err) {
       console.error('Error updating attendance:', err);
       setAlert({ type: 'error', message: 'Error updating attendance record.' });
+    }
+  };
+
+  const handleDeleteAttendanceRecord = async (record: AttendanceRecord) => {
+    if (!window.confirm(`Delete this ${record.type} record (${record.date} ${record.time})? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await window.electronAPI.admin.deleteAttendance(record.id);
+      if (res.success) {
+        setAlert({ type: 'success', message: res.message || 'Attendance record deleted.' });
+        fetchAttendanceRecords(selectedUserFilter);
+      } else {
+        setAlert({ type: 'error', message: res.message || 'Failed to delete record.' });
+      }
+    } catch (err) {
+      console.error('Error deleting attendance record:', err);
+      setAlert({ type: 'error', message: 'Error deleting attendance record.' });
     }
   };
 
@@ -347,6 +388,7 @@ export const AdminDashboard: React.FC = () => {
               records={records}
               showUserColumn={true}
               onEditRecord={(rec) => setEditingRecord(rec)}
+              onDeleteRecord={handleDeleteAttendanceRecord}
             />
           </div>
         )}
@@ -432,6 +474,32 @@ export const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="px-6 py-3.5 text-right font-mono">
                           <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => handleRecordAttendance(u.userId, 'ENTRY')}
+                              disabled={recordingUserId === u.userId}
+                              className="px-2 py-1 rounded bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Record Entry for this user"
+                            >
+                              {recordingUserId === u.userId ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <LogIn className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            <button
+                              onClick={() => handleRecordAttendance(u.userId, 'EXIT')}
+                              disabled={recordingUserId === u.userId}
+                              className="px-2 py-1 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Record Exit for this user"
+                            >
+                              {recordingUserId === u.userId ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <LogOut className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
                             <button
                               onClick={() => setEditingUser(u)}
                               className="px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-800"
