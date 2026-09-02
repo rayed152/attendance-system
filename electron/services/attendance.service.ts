@@ -77,6 +77,17 @@ export class AttendanceService {
   }
 
   /**
+   * Local calendar-day bounds [start, end) for a given date, used to enforce
+   * one Entry + one Exit per day (resets at local midnight).
+   */
+  private getDayBounds(date: Date = new Date()): { start: Date; end: Date } {
+    const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+
+  /**
    * Determine status flag based on timestamp, type, and organization thresholds
    */
   public async calculateStatusFlag(organizationId: string, type: AttendanceType, timestamp: Date): Promise<string> {
@@ -123,6 +134,24 @@ export class AttendanceService {
         return {
           success: false,
           message: 'You are already checked in. Please record an Exit before entering again.',
+        };
+      }
+
+      const { start, end } = this.getDayBounds();
+      const entryUsedToday = await this.prisma.attendance.findFirst({
+        where: {
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+          type: AttendanceType.ENTRY,
+          timestamp: { gte: start, lt: end },
+        },
+      });
+
+      if (entryUsedToday) {
+        return {
+          success: false,
+          message: 'You have already recorded an Entry today. Entry resets at midnight.',
+          data: { resetAt: end.toISOString() },
         };
       }
 
@@ -182,6 +211,24 @@ export class AttendanceService {
         };
       }
 
+      const { start, end } = this.getDayBounds();
+      const exitUsedToday = await this.prisma.attendance.findFirst({
+        where: {
+          organizationId: sessionUser.organizationId,
+          userId: sessionUser.userId,
+          type: AttendanceType.EXIT,
+          timestamp: { gte: start, lt: end },
+        },
+      });
+
+      if (exitUsedToday) {
+        return {
+          success: false,
+          message: 'You have already recorded an Exit today. Exit resets at midnight.',
+          data: { resetAt: end.toISOString() },
+        };
+      }
+
       const now = new Date();
       const statusFlag = await this.calculateStatusFlag(sessionUser.organizationId, AttendanceType.EXIT, now);
       const config = await this.getConfig(sessionUser.organizationId);
@@ -233,9 +280,37 @@ export class AttendanceService {
 
       const status = latest ? (latest.type === AttendanceType.ENTRY ? 'IN' : 'OUT') : 'OUT';
 
+      const { start, end } = this.getDayBounds();
+      const [entryUsedToday, exitUsedToday] = await Promise.all([
+        this.prisma.attendance.findFirst({
+          where: {
+            organizationId: sessionUser.organizationId,
+            userId: sessionUser.userId,
+            type: AttendanceType.ENTRY,
+            timestamp: { gte: start, lt: end },
+          },
+        }),
+        this.prisma.attendance.findFirst({
+          where: {
+            organizationId: sessionUser.organizationId,
+            userId: sessionUser.userId,
+            type: AttendanceType.EXIT,
+            timestamp: { gte: start, lt: end },
+          },
+        }),
+      ]);
+
       return {
         success: true,
-        data: { status, latestRecord: latest ? this.formatRecord(latest) : null },
+        data: {
+          status,
+          latestRecord: latest ? this.formatRecord(latest) : null,
+          entryUsedToday: !!entryUsedToday,
+          exitUsedToday: !!exitUsedToday,
+          canEntry: status === 'OUT' && !entryUsedToday,
+          canExit: status === 'IN' && !exitUsedToday,
+          resetAt: end.toISOString(),
+        },
       };
     } catch (error: any) {
       console.error('AttendanceService.getStatus error:', error);

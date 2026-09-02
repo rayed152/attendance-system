@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AttendanceTable } from '../components/AttendanceTable';
+import { SideNav, SideNavItem } from '../components/SideNav';
 import { EditAttendanceModal } from '../components/EditAttendanceModal';
 import { WarnUserModal } from '../components/WarnUserModal';
 import { RegisterUserModal } from '../components/RegisterUserModal';
@@ -18,7 +19,6 @@ import {
   Edit,
   Building2,
   Palette,
-  Lock,
   Search,
   CheckCircle2,
   Image as ImageIcon,
@@ -33,6 +33,19 @@ interface UserItem {
   role: 'USER' | 'ADMIN';
   isBlocked?: boolean;
 }
+
+const adminNavItems: SideNavItem[] = [
+  { id: 'logs', label: 'Attendance Logs', icon: Clock },
+  { id: 'users', label: 'User Management', icon: Users },
+  { id: 'settings', label: 'Company Settings', icon: Building2 },
+  {
+    id: 'theme',
+    label: 'Theme Settings',
+    icon: Palette,
+    disabled: true,
+    title: 'Theme customization coming in future update',
+  },
+];
 
 export const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'logs' | 'users' | 'settings' | 'theme'>('logs');
@@ -239,59 +252,12 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="flex gap-6 items-start">
       {/* LEFT SIDEBAR NAVIGATION */}
-      <aside className="w-52 shrink-0 glass-panel p-4 rounded-2xl border border-slate-800 space-y-3 sticky top-24">
-        <div className="px-3 py-2 border-b border-slate-800/80 mb-2">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Admin Control</h3>
-        </div>
-
-        <nav className="space-y-1.5 text-xs font-semibold">
-          <button
-            onClick={() => setActiveTab('logs')}
-            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${activeTab === 'logs'
-              ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Attendance Logs</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${activeTab === 'users'
-              ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>User Management</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${activeTab === 'settings'
-              ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-          >
-            <Building2 className="w-4 h-4" />
-            <span>Company Settings</span>
-          </button>
-
-          {/* Theme Settings (Grayed Out) */}
-          <button
-            disabled
-            className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-600 bg-slate-900/30 border border-slate-900 cursor-not-allowed opacity-60"
-            title="Theme customization coming in future update"
-          >
-            <div className="flex items-center gap-3">
-              <Palette className="w-4 h-4 text-slate-600" />
-              <span>Theme Settings</span>
-            </div>
-            <Lock className="w-3.5 h-3.5 text-slate-600" />
-          </button>
-        </nav>
-      </aside>
+      <SideNav
+        heading="Admin Control"
+        activeId={activeTab}
+        onChange={(id) => setActiveTab(id as 'logs' | 'users' | 'settings' | 'theme')}
+        items={adminNavItems}
+      />
 
       {/* RIGHT MAIN CONTENT AREA */}
       <section className="flex-1 min-w-0 space-y-6">

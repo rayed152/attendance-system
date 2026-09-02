@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from '../components/Navbar';
+import { PageContainer } from '../components/PageContainer';
 import { AttendanceTable } from '../components/AttendanceTable';
 import { UserWarningsBanner } from '../components/UserWarningsBanner';
 import { AdminDashboard } from './AdminDashboard';
@@ -23,6 +24,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const [activeTab, setActiveTab] = useState<'user' | 'admin'>('user');
   const [currentDateTime, setCurrentDateTime] = useState<Date>(new Date());
   const [status, setStatus] = useState<'IN' | 'OUT'>('OUT');
+  const [entryUsedToday, setEntryUsedToday] = useState<boolean>(false);
+  const [exitUsedToday, setExitUsedToday] = useState<boolean>(false);
+  const [resetAt, setResetAt] = useState<Date | null>(null);
   const [history, setHistory] = useState<AttendanceRecord[]>([]);
   const [warnings, setWarnings] = useState<any[]>([]);
   const [loadingAction, setLoadingAction] = useState<boolean>(false);
@@ -42,6 +46,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     fetchDashboardData();
   }, []);
 
+  // Refresh status once the daily reset (midnight) has passed, so the
+  // Entry/Exit limits clear without needing a manual refresh.
+  useEffect(() => {
+    if (resetAt && currentDateTime >= resetAt) {
+      fetchDashboardData();
+    }
+  }, [currentDateTime, resetAt]);
+
   const fetchDashboardData = async () => {
     try {
       const [statusRes, historyRes, warningsRes] = await Promise.all([
@@ -52,6 +64,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
       if (statusRes.success && statusRes.data) {
         setStatus(statusRes.data.status);
+        setEntryUsedToday(!!statusRes.data.entryUsedToday);
+        setExitUsedToday(!!statusRes.data.exitUsedToday);
+        setResetAt(statusRes.data.resetAt ? new Date(statusRes.data.resetAt) : null);
       }
 
       if (historyRes.success && historyRes.data) {
@@ -129,6 +144,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     second: '2-digit',
   });
 
+  const formatCountdown = (target: Date): string => {
+    const diffMs = target.getTime() - currentDateTime.getTime();
+    if (diffMs <= 0) return '0h 00m 00s';
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  };
+
+  const entryDisabled = loadingAction || status === 'IN' || entryUsedToday;
+  const exitDisabled = loadingAction || status === 'OUT' || exitUsedToday;
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-950">
       <Navbar
@@ -141,11 +169,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       <main className="flex-1 w-full">
         {/* Render Admin Dashboard if Admin tab selected */}
         {activeTab === 'admin' && user.role === 'ADMIN' ? (
-          <div className="max-w-screen-2xl w-full mx-auto px-6 py-8">
+          <PageContainer>
             <AdminDashboard />
-          </div>
+          </PageContainer>
         ) : (
-          <div className="max-w-5xl w-full mx-auto px-6 py-8 space-y-8">
+          <PageContainer>
             {/* User Warning Notices Banner */}
             <UserWarningsBanner
               warnings={warnings}
@@ -202,9 +230,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               {/* ENTRY BUTTON */}
               <button
                 onClick={handleEntry}
-                disabled={loadingAction || status === 'IN'}
+                disabled={entryDisabled}
                 className={`group relative overflow-hidden rounded-2xl p-8 text-left transition-all duration-300 border flex flex-col justify-between h-48 shadow-xl ${
-                  status === 'IN'
+                  entryDisabled
                     ? 'bg-slate-900/40 border-slate-800/40 opacity-50 cursor-not-allowed'
                     : 'bg-gradient-to-br from-emerald-950/90 to-slate-900 border-emerald-800/60 hover:border-emerald-500/80 hover:shadow-emerald-900/30 hover:scale-[1.01] active:scale-[0.99] glow-emerald'
                 }`}
@@ -218,7 +246,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
                 <div>
                   <h2 className="text-3xl font-extrabold text-white tracking-tight mb-1">ENTRY</h2>
-                  <p className="text-xs text-slate-400">Punctuality Rule: Entry after 9:00 AM marked as LATE</p>
+                  {entryUsedToday && status !== 'IN' && resetAt ? (
+                    <p className="text-xs text-amber-400 font-semibold">
+                      Today's Entry used. Available again in {formatCountdown(resetAt)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-400">Punctuality Rule: Entry after 9:00 AM marked as LATE</p>
+                  )}
                 </div>
 
                 {loadingAction && (
@@ -231,9 +265,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
               {/* EXIT BUTTON */}
               <button
                 onClick={handleExit}
-                disabled={loadingAction || status === 'OUT'}
+                disabled={exitDisabled}
                 className={`group relative overflow-hidden rounded-2xl p-8 text-left transition-all duration-300 border flex flex-col justify-between h-48 shadow-xl ${
-                  status === 'OUT'
+                  exitDisabled
                     ? 'bg-slate-900/40 border-slate-800/40 opacity-50 cursor-not-allowed'
                     : 'bg-gradient-to-br from-rose-950/90 to-slate-900 border-rose-800/60 hover:border-rose-500/80 hover:shadow-rose-900/30 hover:scale-[1.01] active:scale-[0.99] glow-rose'
                 }`}
@@ -247,7 +281,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
                 <div>
                   <h2 className="text-3xl font-extrabold text-white tracking-tight mb-1">EXIT</h2>
-                  <p className="text-xs text-slate-400">Punctuality Rule: Exit before 5:00 PM marked as EARLY EXIT</p>
+                  {exitUsedToday && status !== 'IN' && resetAt ? (
+                    <p className="text-xs text-amber-400 font-semibold">
+                      Today's Exit used. Available again in {formatCountdown(resetAt)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-400">Punctuality Rule: Exit before 5:00 PM marked as EARLY EXIT</p>
+                  )}
                 </div>
 
                 {loadingAction && (
@@ -260,7 +300,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
             {/* User Attendance History Section */}
             <AttendanceTable records={history} />
-          </div>
+          </PageContainer>
         )}
       </main>
     </div>
