@@ -65,13 +65,13 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
               <UserPen className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Edit User Information</h3>
+              <h3 className="text-base font-bold text-slate-100">Edit User Information</h3>
               <p className="text-xs text-slate-400">User ID: {user.userId}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+            className="p-1 hover:bg-slate-500/10 rounded-lg text-slate-400 hover:text-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>

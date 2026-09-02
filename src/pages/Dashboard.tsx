@@ -198,7 +198,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 </div>
                 <div className="text-right md:text-left">
                   <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Current Time</p>
-                  <p className="text-2xl font-mono font-bold text-white tracking-widest">{timeFormatted}</p>
+                  <p className="text-2xl font-mono font-bold text-slate-100 tracking-widest">{timeFormatted}</p>
                 </div>
               </div>
 
@@ -245,7 +245,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 </div>
 
                 <div>
-                  <h2 className="text-3xl font-extrabold text-white tracking-tight mb-1">ENTRY</h2>
+                  <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight mb-1">ENTRY</h2>
                   {entryUsedToday && status !== 'IN' && resetAt ? (
                     <p className="text-xs text-amber-400 font-semibold">
                       Today's Entry used. Available again in {formatCountdown(resetAt)}
@@ -280,7 +280,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                 </div>
 
                 <div>
-                  <h2 className="text-3xl font-extrabold text-white tracking-tight mb-1">EXIT</h2>
+                  <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight mb-1">EXIT</h2>
                   {exitUsedToday && status !== 'IN' && resetAt ? (
                     <p className="text-xs text-amber-400 font-semibold">
                       Today's Exit used. Available again in {formatCountdown(resetAt)}

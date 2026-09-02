@@ -58,7 +58,7 @@ export const SideNav: React.FC<SideNavProps> = ({ heading, items, activeId, onCh
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all ${
                 activeId === item.id
                   ? 'bg-sky-600 text-white shadow-lg shadow-sky-600/20'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
               }`}
             >
               <Icon className="w-4 h-4" />

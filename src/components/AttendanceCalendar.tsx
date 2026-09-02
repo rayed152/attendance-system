@@ -179,7 +179,7 @@ export const AttendanceCalendar: React.FC = () => {
       <div className="glass-panel p-6 rounded-2xl border border-slate-800">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-sky-400" />
               Weekly Working Days
             </h2>
@@ -220,7 +220,7 @@ export const AttendanceCalendar: React.FC = () => {
       {/* Calendar Card */}
       <div className="glass-panel p-6 rounded-2xl border border-slate-800">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
+          <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
             <CalendarOff className="w-5 h-5 text-sky-400" />
             Off Days Calendar
           </h2>
@@ -282,7 +282,7 @@ export const AttendanceCalendar: React.FC = () => {
                     ? 'bg-rose-950/70 text-rose-300 border-rose-800/60'
                     : isWeeklyOff
                     ? 'bg-slate-900/60 text-slate-600 border-slate-900 cursor-default'
-                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-sky-700 hover:text-white cursor-pointer'
+                    : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-sky-700 hover:text-slate-100 cursor-pointer'
                 } ${isSelected ? 'ring-2 ring-sky-500' : ''} ${isToday ? 'font-black' : ''}`}
               >
                 {togglingDate === dateStr ? (

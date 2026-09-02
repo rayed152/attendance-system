@@ -40,7 +40,7 @@ export const UserWarningsBanner: React.FC<UserWarningsBannerProps> = ({ warnings
 
           <button
             onClick={() => onDismiss(w.id)}
-            className="p-1 hover:bg-white/10 rounded-lg text-amber-400 hover:text-amber-100 transition-colors ml-4"
+            className="p-1 hover:bg-amber-500/10 rounded-lg text-amber-400 hover:text-amber-100 transition-colors ml-4"
             title="Acknowledge & Dismiss"
           >
             <X className="w-4 h-4" />

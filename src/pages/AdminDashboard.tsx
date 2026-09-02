@@ -435,7 +435,7 @@ export const AdminDashboard: React.FC = () => {
                   <p className="text-xs text-slate-400 font-semibold uppercase">
                     Total Users
                   </p>
-                  <p className="text-2xl font-bold text-white mt-1 font-mono">
+                  <p className="text-2xl font-bold text-slate-100 mt-1 font-mono">
                     {users.length}
                   </p>
                 </div>
@@ -706,7 +706,7 @@ export const AdminDashboard: React.FC = () => {
             className="glass-panel p-8 rounded-2xl border border-slate-800 space-y-6"
           >
             <div className="border-b border-slate-800 pb-4">
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-sky-400" />
                 Company Branding & Shift Rules
               </h2>

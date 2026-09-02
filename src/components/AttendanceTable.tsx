@@ -72,7 +72,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
             onClick={() =>
               setViewMode((mode) => (mode === "logs" ? "graph" : "logs"))
             }
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white text-xs font-semibold transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-slate-100 text-xs font-semibold transition-all"
             title={
               viewMode === "logs"
                 ? "Switch to graph view"
@@ -254,7 +254,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 disabled:hover:text-slate-300"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-slate-100 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 disabled:hover:text-slate-300"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   Prev
@@ -269,7 +269,7 @@ export const AttendanceTable: React.FC<AttendanceTableProps> = ({
                     setCurrentPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={page === totalPages}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 disabled:hover:text-slate-300"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-slate-100 text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-slate-900 disabled:hover:text-slate-300"
                 >
                   Next
                   <ChevronRight className="w-3.5 h-3.5" />

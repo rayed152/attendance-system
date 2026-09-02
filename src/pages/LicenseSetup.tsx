@@ -86,7 +86,7 @@ export const LicenseSetup: React.FC<LicenseSetupProps> = ({ onActivated }) => {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-600 to-sky-600 shadow-xl shadow-indigo-500/20 mb-2">
             <Building2 className="w-9 h-9 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Company License Activation</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Company License Activation</h1>
           <p className="text-slate-400 text-sm">Bind this desktop app to your verified company license</p>
         </div>
 
@@ -194,7 +194,7 @@ export const LicenseSetup: React.FC<LicenseSetupProps> = ({ onActivated }) => {
                       </div>
                       <span className="text-[10px] text-sky-400 block">{org.licenseKey}</span>
                     </div>
-                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 group-hover:text-white">
+                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400 group-hover:text-slate-100">
                       Select
                     </span>
                   </button>

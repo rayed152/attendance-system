@@ -59,7 +59,7 @@ export const Login: React.FC<LoginProps> = ({ tenant, onLoginSuccess, onSwitchLi
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 shadow-xl shadow-sky-500/20 mb-2">
             <ShieldCheck className="w-9 h-9 text-white" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Attendance System</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-100">Attendance System</h1>
 
           {/* Bound Company Tenant Badge */}
           <div className="inline-flex items-center gap-2 bg-slate-900 px-3.5 py-1.5 rounded-full border border-slate-800 text-xs font-semibold text-sky-400">
